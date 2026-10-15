@@ -14,7 +14,17 @@ Fellow is a lightweight HR workspace for a 20 to 200 person company: people, dep
 The application is the vehicle; the point of the project is the path it takes from a laptop to a monitored Kubernetes cluster:
 tested, scanned, containerised, provisioned with Terraform, packaged with Helm and delivered through GitOps.
 
-Built as the DevOps final capstone (Session 21). Slides and the demo video are in [`demo/`](demo/).
+Built as the DevOps final capstone (Session 21).
+
+## Demo video
+
+[![Watch the Fellow demo video](docs/screenshots/demo-video-thumbnail.png)](demo/fellow-demo.mp4)
+
+**[Watch the 9 minute walkthrough](demo/fellow-demo.mp4)** (1080p, subtitles burned in, [`.srt`](demo/fellow-demo.srt) included): the app, the codebase and API docs,
+a live push through CI/CD and Argo CD, Terraform, Kubernetes autoscaling, Prometheus and Grafana, and the troubleshooting labs.
+Every scene is a real screen recording, produced with the scripts in [`tools/video`](tools/video/).
+
+Slides: [`presentation.pptx`](presentation.pptx) (PDF copy: [`demo/slides.pdf`](demo/slides.pdf)).
 
 ---
 
@@ -126,8 +136,10 @@ staging environment to it. Git is the single source of truth for what runs in st
 ├── scripts/               kind add-ons, deploy, monitoring, Argo CD and load test scripts
 ├── troubleshooting/       broken image and broken Service labs
 ├── tools/screenshots/     reproducible live screenshots for these docs
+├── tools/video/           scripted screen recording, subtitles and assembly for the demo video
 ├── docs/screenshots/      screenshots used below
-└── demo/                  presentation (PPTX and PDF) and demo video
+├── demo/                  demo video, its subtitles and a PDF copy of the slides
+└── presentation.pptx      presentation deck
 ```
 
 ## Run it locally with Docker Compose
@@ -372,5 +384,5 @@ Browser screenshots are captured live from the running stack with [`tools/screen
 
 ## Demo
 
-- Slides: [`demo/presentation.pptx`](demo/presentation.pptx) and [`demo/slides.pdf`](demo/slides.pdf)
-- Video: `demo/` (recorded walkthrough of the pipeline, Terraform, Kubernetes, Argo CD, Prometheus and Grafana)
+- Video: [`demo/fellow-demo.mp4`](demo/fellow-demo.mp4) with subtitles in [`demo/fellow-demo.srt`](demo/fellow-demo.srt)
+- Slides: [`presentation.pptx`](presentation.pptx) and [`demo/slides.pdf`](demo/slides.pdf)
