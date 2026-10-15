@@ -1,0 +1,64 @@
+{{- $name := printf "%s-frontend" (include "fellow.fullname" .) -}}
+{{- $ctx := dict "root" . "component" "frontend" -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "fellow.labels" . | nindent 4 }}
+    {{- include "fellow.selectorLabels" $ctx | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "fellow.selectorLabels" $ctx | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.frontend.port }}
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "fellow.labels" . | nindent 4 }}
+    {{- include "fellow.selectorLabels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  selector:
+    matchLabels:
+      {{- include "fellow.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fellow.labels" . | nindent 8 }}
+        {{- include "fellow.selectorLabels" $ctx | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "fellow.podSecurity" . | nindent 8 }}
+      containers:
+        - name: frontend
+          image: {{ include "fellow.image" (dict "root" . "repository" .Values.frontend.repository) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.port }}
+          env:
+            - name: BACKEND_HOST
+              value: {{ include "fellow.fullname" . }}-backend
+            - name: BACKEND_PORT
+              value: {{ .Values.backend.port | quote }}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+          securityContext:
+            {{- include "fellow.containerSecurity" . | nindent 12 }}

@@ -1,0 +1,11 @@
+# Local kind cluster: images are built locally and loaded with `kind load docker-image`.
+imageTag: dev
+image:
+  registry: fellow
+  pullPolicy: Never
+postgres:
+  password: fellow-local
+serviceMonitor:
+  enabled: true
+  labels:
+    release: monitoring

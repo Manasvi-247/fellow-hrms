@@ -1,0 +1,53 @@
+# Image tag for both services. CI sets this to the Git commit SHA.
+imageTag: ""
+
+image:
+  registry: ghcr.io/manasvi-247
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+backend:
+  repository: hrms-backend
+  replicas: 2
+  port: 8000
+  seedDemoData: true
+  resources:
+    requests: {cpu: 100m, memory: 192Mi}
+    limits: {cpu: 500m, memory: 384Mi}
+
+frontend:
+  repository: hrms-frontend
+  replicas: 2
+  port: 8080
+  resources:
+    requests: {cpu: 25m, memory: 32Mi}
+    limits: {cpu: 200m, memory: 128Mi}
+
+postgres:
+  image: postgres:16-alpine
+  database: fellow
+  username: fellow
+  # Override at install time, for example --set postgres.password=$(openssl rand -hex 16)
+  password: change-me
+  storage: 1Gi
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: 500m, memory: 512Mi}
+
+ingress:
+  enabled: true
+  className: nginx
+  host: fellow.localhost
+  tls: []
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 60
+
+serviceMonitor:
+  enabled: false
+  interval: 15s
+  labels: {}

@@ -1,0 +1,96 @@
+{{- $name := printf "%s-backend" (include "fellow.fullname" .) -}}
+{{- $ctx := dict "root" . "component" "backend" -}}
+{{- $image := include "fellow.image" (dict "root" . "repository" .Values.backend.repository) -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "fellow.labels" . | nindent 4 }}
+    {{- include "fellow.selectorLabels" $ctx | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "fellow.selectorLabels" $ctx | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.backend.port }}
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "fellow.labels" . | nindent 4 }}
+    {{- include "fellow.selectorLabels" $ctx | nindent 4 }}
+spec:
+  {{- if not .Values.hpa.enabled }}
+  replicas: {{ .Values.backend.replicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "fellow.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fellow.labels" . | nindent 8 }}
+        {{- include "fellow.selectorLabels" $ctx | nindent 8 }}
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "fellow.podSecurity" . | nindent 8 }}
+      initContainers:
+        - name: wait-for-postgres
+          image: {{ .Values.postgres.image }}
+          command: ["sh", "-c", "until pg_isready -h {{ include "fellow.fullname" . }}-postgres -p 5432; do echo waiting for postgres; sleep 2; done"]
+          securityContext:
+            runAsUser: 70
+            {{- include "fellow.containerSecurity" . | nindent 12 }}
+        # Runs Alembic migrations and the demo seed under a Postgres advisory lock, so replicas never race.
+        - name: migrate
+          image: {{ $image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "-m", "app.bootstrap"]
+          envFrom:
+            - secretRef:
+                name: {{ include "fellow.fullname" . }}-db
+          env:
+            - name: SEED_DEMO_DATA
+              value: {{ .Values.backend.seedDemoData | quote }}
+          securityContext:
+            {{- include "fellow.containerSecurity" . | nindent 12 }}
+      containers:
+        - name: backend
+          image: {{ $image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.port }}
+          envFrom:
+            - secretRef:
+                name: {{ include "fellow.fullname" . }}-db
+          env:
+            - name: RUN_MIGRATIONS
+              value: "false"
+          startupProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 3
+            failureThreshold: 20
+          readinessProbe:
+            httpGet: {path: /ready, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 15
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          securityContext:
+            {{- include "fellow.containerSecurity" . | nindent 12 }}

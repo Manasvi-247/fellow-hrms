@@ -1,0 +1,7 @@
+Fellow {{ .Values.imageTag }} is deployed to namespace {{ .Release.Namespace }}.
+
+  kubectl get pods,svc,ingress,hpa -n {{ .Release.Namespace }}
+{{- if .Values.ingress.enabled }}
+
+Open http://{{ .Values.ingress.host }}/ (the API is served under http://{{ .Values.ingress.host }}/api/).
+{{- end }}
