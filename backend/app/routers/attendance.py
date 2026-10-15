@@ -1,20 +1,21 @@
 import calendar
-from datetime import date, timezone
+from datetime import date, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
 from ..models import Attendance, Employee, LeaveRequest
 from ..schemas import AttendanceAction, AttendanceOut
 from ..services import (
+    ATTENDANCE_LOAD,
     approved_leaves_on,
     attendance_out,
     get_or_404,
+    is_working_day,
     late_cutoff,
     now_local,
-    to_local,
     today_local,
     working_days,
 )
@@ -37,22 +38,28 @@ def placeholder(emp: Employee, day: date, status_value: str) -> AttendanceOut:
 
 
 def daily_board(db: Session, day: date, department_id: int | None) -> list[AttendanceOut]:
-    stmt = select(Employee).where(Employee.status != "EXITED", Employee.date_of_joining <= day)
+    stmt = (
+        select(Employee)
+        .options(selectinload(Employee.department))
+        .where(Employee.status != "EXITED", Employee.date_of_joining <= day)
+    )
     if department_id is not None:
         stmt = stmt.where(Employee.department_id == department_id)
     employees = list(db.scalars(stmt.order_by(Employee.first_name)))
     records = {
         r.employee_id: r
-        for r in db.scalars(select(Attendance).where(Attendance.date == day))
+        for r in db.scalars(select(Attendance).options(*ATTENDANCE_LOAD).where(Attendance.date == day))
     }
-    on_leave = {l.employee_id for l in approved_leaves_on(db, day)}
+    working = is_working_day(db, day)
+    on_leave = {l.employee_id for l in approved_leaves_on(db, day)} if working else set()
+    can_be_absent = working and day <= today_local()
     rows = []
     for emp in employees:
         if emp.id in records:
             rows.append(attendance_out(records[emp.id]))
         elif emp.id in on_leave:
             rows.append(placeholder(emp, day, "ON_LEAVE"))
-        else:
+        elif can_be_absent:
             rows.append(placeholder(emp, day, "ABSENT"))
     return rows
 
@@ -70,7 +77,9 @@ def monthly_history(db: Session, emp: Employee, month: str) -> list[AttendanceOu
     records = {
         r.date: r
         for r in db.scalars(
-            select(Attendance).where(Attendance.employee_id == emp.id, Attendance.date.between(start, end))
+            select(Attendance)
+            .options(*ATTENDANCE_LOAD)
+            .where(Attendance.employee_id == emp.id, Attendance.date.between(start, end))
         )
     }
     leaves = list(
@@ -116,7 +125,7 @@ def check_in(payload: AttendanceAction, db: Session = Depends(get_db)):
     emp = get_or_404(db, Employee, payload.employee_id, "Employee")
     if emp.status == "EXITED":
         raise HTTPException(status_code=400, detail="Exited employees cannot check in")
-    moment = to_local(payload.at) if payload.at else now_local()
+    moment = now_local()
     existing = db.scalar(
         select(Attendance).where(Attendance.employee_id == emp.id, Attendance.date == moment.date())
     )
@@ -137,16 +146,20 @@ def check_in(payload: AttendanceAction, db: Session = Depends(get_db)):
 @router.post("/check-out", response_model=AttendanceOut)
 def check_out(payload: AttendanceAction, db: Session = Depends(get_db)):
     emp = get_or_404(db, Employee, payload.employee_id, "Employee")
-    moment = to_local(payload.at) if payload.at else now_local()
-    record = db.scalar(
-        select(Attendance).where(Attendance.employee_id == emp.id, Attendance.date == moment.date())
+    moment = now_local()
+    # Look back one day so a shift that crosses midnight can still be closed.
+    recent = list(
+        db.scalars(
+            select(Attendance)
+            .where(Attendance.employee_id == emp.id, Attendance.date >= moment.date() - timedelta(days=1))
+            .order_by(Attendance.date.desc())
+        )
     )
+    record = next((r for r in recent if r.check_out is None), None)
     if record is None:
+        if any(r.date == moment.date() for r in recent):
+            raise HTTPException(status_code=409, detail="Already checked out today")
         raise HTTPException(status_code=409, detail="You have not checked in today")
-    if record.check_out is not None:
-        raise HTTPException(status_code=409, detail="Already checked out today")
-    if moment < to_local(record.check_in):
-        raise HTTPException(status_code=400, detail="Check out cannot be before check in")
     record.check_out = moment.astimezone(timezone.utc)
     db.commit()
     db.refresh(record)

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import Employee, LeaveRequest, LeaveType
 from ..schemas import LeaveApply, LeaveDecision, LeaveOut, LeaveTypeOut
-from ..services import ACTIVE_LEAVE_STATUSES, count_leave_days, get_or_404, leave_balances, leave_out
+from ..services import ACTIVE_LEAVE_STATUSES, LEAVE_LOAD, count_leave_days, get_or_404, leave_balances, leave_out
 
 router = APIRouter(prefix="/api", tags=["leave"])
 
@@ -27,7 +27,12 @@ def list_leaves(
     to: date | None = None,
     db: Session = Depends(get_db),
 ):
-    stmt = select(LeaveRequest).join(LeaveRequest.employee).order_by(LeaveRequest.applied_at.desc())
+    stmt = (
+        select(LeaveRequest)
+        .join(LeaveRequest.employee)
+        .options(*LEAVE_LOAD)
+        .order_by(LeaveRequest.applied_at.desc())
+    )
     if employee_id is not None:
         stmt = stmt.where(LeaveRequest.employee_id == employee_id)
     if status_filter:

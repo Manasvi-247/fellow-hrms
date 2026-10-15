@@ -14,7 +14,7 @@ from ..schemas import (
     UpcomingBirthday,
     UpcomingHoliday,
 )
-from ..services import approved_leaves_on, today_local
+from ..services import approved_leaves_on, is_working_day, today_local
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -36,7 +36,8 @@ def next_occurrence(original: date, today: date) -> date:
 def stats(db: Session = Depends(get_db)):
     today = today_local()
     window_end = today + timedelta(days=UPCOMING_WINDOW_DAYS)
-    active = list(db.scalars(select(Employee).where(Employee.status != "EXITED")))
+    not_exited = list(db.scalars(select(Employee).where(Employee.status != "EXITED")))
+    active = [e for e in not_exited if e.date_of_joining <= today]
     active_ids = {e.id for e in active}
 
     attendance_today = list(db.scalars(select(Attendance).where(Attendance.date == today)))
@@ -46,13 +47,12 @@ def stats(db: Session = Depends(get_db)):
 
     leaves_today = [l for l in approved_leaves_on(db, today) if l.employee_id in active_ids]
     on_leave_ids = {l.employee_id for l in leaves_today} - checked_in
-    working_today = today.weekday() < 5 and db.scalar(select(Holiday.id).where(Holiday.date == today)) is None
-    absent = len(active_ids - checked_in - on_leave_ids) if working_today else 0
+    absent = len(active_ids - checked_in - on_leave_ids) if is_working_day(db, today) else 0
 
     headcount = db.execute(
         select(Department.name, func.count(Employee.id))
         .join(Employee, Employee.department_id == Department.id)
-        .where(Employee.status != "EXITED")
+        .where(Employee.status != "EXITED", Employee.date_of_joining <= today)
         .group_by(Department.name)
         .order_by(func.count(Employee.id).desc())
     ).all()
@@ -80,7 +80,7 @@ def stats(db: Session = Depends(get_db)):
         late_today=late,
         pending_leaves=db.scalar(select(func.count(LeaveRequest.id)).where(LeaveRequest.status == "PENDING")) or 0,
         new_joiners_this_month=sum(
-            1 for e in active if e.date_of_joining.year == today.year and e.date_of_joining.month == today.month
+            1 for e in not_exited if e.date_of_joining.year == today.year and e.date_of_joining.month == today.month
         ),
         headcount_by_department=[DepartmentCount(department=name, count=count) for name, count in headcount],
         on_leave_today_list=[

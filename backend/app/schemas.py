@@ -1,7 +1,7 @@
 from datetime import date, datetime
-from typing import Literal
+from typing import ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Role = Literal["ADMIN", "MANAGER", "EMPLOYEE"]
 EmploymentType = Literal["FULL_TIME", "PART_TIME", "CONTRACT", "INTERN"]
@@ -18,6 +18,23 @@ class ORM(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PartialUpdate(BaseModel):
+    """Omitted fields are left unchanged; null is only accepted for fields that may be cleared."""
+
+    nullable_fields: ClassVar[frozenset[str]] = frozenset()
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_nulls(cls, data):
+        if isinstance(data, dict):
+            invalid = sorted(
+                k for k, v in data.items() if v is None and k in cls.model_fields and k not in cls.nullable_fields
+            )
+            if invalid:
+                raise ValueError(f"{', '.join(invalid)} cannot be null")
+        return data
+
+
 class DepartmentIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     code: str = Field(min_length=1, max_length=20)
@@ -25,7 +42,9 @@ class DepartmentIn(BaseModel):
     head_id: int | None = None
 
 
-class DepartmentUpdate(BaseModel):
+class DepartmentUpdate(PartialUpdate):
+    nullable_fields = frozenset({"head_id"})
+
     name: str | None = Field(default=None, min_length=1, max_length=100)
     code: str | None = Field(default=None, min_length=1, max_length=20)
     description: str | None = None
@@ -60,7 +79,9 @@ class EmployeeIn(BaseModel):
     address: str = ""
 
 
-class EmployeeUpdate(BaseModel):
+class EmployeeUpdate(PartialUpdate):
+    nullable_fields = frozenset({"department_id", "manager_id", "date_of_birth", "gender"})
+
     first_name: str | None = Field(default=None, min_length=1, max_length=80)
     last_name: str | None = Field(default=None, max_length=80)
     email: str | None = Field(default=None, pattern=EMAIL_PATTERN, max_length=200)
@@ -154,7 +175,6 @@ class LeaveOut(BaseModel):
 
 class AttendanceAction(BaseModel):
     employee_id: int
-    at: datetime | None = None
 
 
 class AttendanceOut(BaseModel):

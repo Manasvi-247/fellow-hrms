@@ -3,7 +3,8 @@ from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, selectinload
 
 from .config import settings
 from .models import Attendance, Department, Employee, Holiday, LeaveRequest, LeaveType
@@ -39,18 +40,37 @@ def get_or_404(db: Session, model, obj_id: int, label: str):
     return obj
 
 
+EMPLOYEE_LOAD = (selectinload(Employee.department), selectinload(Employee.manager))
+LEAVE_LOAD = (
+    selectinload(LeaveRequest.employee).selectinload(Employee.department),
+    selectinload(LeaveRequest.leave_type),
+    selectinload(LeaveRequest.approver),
+)
+ATTENDANCE_LOAD = (selectinload(Attendance.employee).selectinload(Employee.department),)
+
+
+def commit_or_conflict(db: Session, message: str):
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=message)
+
+
 def employee_out(emp: Employee) -> EmployeeOut:
-    return EmployeeOut(
-        **{c: getattr(emp, c) for c in EmployeeOut.model_fields if hasattr(emp, c) and c not in ("department_name", "manager_name")},
-        department_name=emp.department.name if emp.department else None,
-        manager_name=emp.manager.full_name if emp.manager else None,
-    )
+    return EmployeeOut.model_validate(emp)
 
 
-def department_out(db: Session, dept: Department) -> DepartmentOut:
-    headcount = db.scalar(
-        select(func.count(Employee.id)).where(Employee.department_id == dept.id, Employee.status != "EXITED")
-    )
+def department_headcounts(db: Session) -> dict[int, int]:
+    rows = db.execute(
+        select(Employee.department_id, func.count(Employee.id))
+        .where(Employee.status != "EXITED", Employee.department_id.is_not(None))
+        .group_by(Employee.department_id)
+    ).all()
+    return dict(rows)
+
+
+def department_out(dept: Department, headcount: int) -> DepartmentOut:
     return DepartmentOut(
         id=dept.id,
         name=dept.name,
@@ -58,7 +78,7 @@ def department_out(db: Session, dept: Department) -> DepartmentOut:
         description=dept.description,
         head_id=dept.head_id,
         head_name=dept.head.full_name if dept.head else None,
-        headcount=headcount or 0,
+        headcount=headcount,
     )
 
 
@@ -68,7 +88,7 @@ def leave_out(leave: LeaveRequest) -> LeaveOut:
         id=leave.id,
         employee_id=leave.employee_id,
         employee_name=emp.full_name,
-        department_name=emp.department.name if emp.department else None,
+        department_name=emp.department_name,
         leave_type_id=leave.leave_type_id,
         leave_type_name=leave.leave_type.name,
         from_date=leave.from_date,
@@ -97,7 +117,7 @@ def attendance_out(record: Attendance) -> AttendanceOut:
         id=record.id,
         employee_id=record.employee_id,
         employee_name=emp.full_name,
-        department_name=emp.department.name if emp.department else None,
+        department_name=emp.department_name,
         date=record.date,
         check_in=to_local(record.check_in),
         check_out=to_local(record.check_out) if record.check_out else None,
@@ -121,10 +141,15 @@ def working_days(db: Session, start: date, end: date) -> list[date]:
     return days
 
 
+def is_working_day(db: Session, day: date) -> bool:
+    return bool(working_days(db, day, day))
+
+
 def count_leave_days(db: Session, start: date, end: date, half_day: bool) -> float:
-    if half_day:
+    days = len(working_days(db, start, end))
+    if half_day and days:
         return 0.5
-    return float(len(working_days(db, start, end)))
+    return float(days)
 
 
 def leave_balances(db: Session, employee_id: int, year: int | None = None) -> list[LeaveBalanceOut]:
@@ -161,7 +186,9 @@ def leave_balances(db: Session, employee_id: int, year: int | None = None) -> li
 def approved_leaves_on(db: Session, day: date) -> list[LeaveRequest]:
     return list(
         db.scalars(
-            select(LeaveRequest).where(
+            select(LeaveRequest)
+            .options(*LEAVE_LOAD)
+            .where(
                 LeaveRequest.status == "APPROVED",
                 LeaveRequest.from_date <= day,
                 LeaveRequest.to_date >= day,
