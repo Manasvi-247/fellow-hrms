@@ -6,6 +6,8 @@
 <p align="center"><b>An employee management app, shipped the DevOps way.</b><br>
 React · FastAPI · PostgreSQL · Docker · GitHub Actions · Trivy · GHCR · Terraform · LocalStack · Kubernetes (kind) · Helm · Argo CD · Prometheus · Grafana</p>
 
+<p align="center"><b>Live:</b> <a href="https://fellow-hrms.onrender.com">fellow-hrms.onrender.com</a> · API docs: <a href="https://fellow-hrms-api.onrender.com/docs">fellow-hrms-api.onrender.com/docs</a><br><sub>Free tier: the API sleeps when idle, so the first request can take about a minute.</sub></p>
+
 <p align="center">
   <a href="https://github.com/Manasvi-247/fellow-hrms/actions/workflows/ci-cd.yml"><img src="https://github.com/Manasvi-247/fellow-hrms/actions/workflows/ci-cd.yml/badge.svg" alt="CI/CD"></a>
 </p>
@@ -42,8 +44,9 @@ Slides: [`presentation.pptx`](presentation.pptx) (PDF copy: [`demo/slides.pdf`](
 10. [GitOps with Argo CD](#gitops-with-argo-cd)
 11. [Observability](#observability)
 12. [Troubleshooting labs](#troubleshooting-labs)
-13. [Screenshots](#screenshots)
-14. [Known issues and limitations](#known-issues-and-limitations)
+13. [Live deployment on Render](#live-deployment-on-render)
+14. [Screenshots](#screenshots)
+15. [Known issues and limitations](#known-issues-and-limitations)
 
 ---
 
@@ -356,6 +359,25 @@ Problems hit and fixed while building this:
 | Staging showed old demo data | the database volume was seeded by an older image and seeding is idempotent | reset the staging database volume |
 | Code review | 10 issues (null updates, half days on weekends, overnight check-out, N+1 queries and more) | fixed, each with a regression test |
 
+## Live deployment on Render
+
+The public demo runs on [Render](https://render.com)'s free tier, defined as code in [`render.yaml`](render.yaml) (a Render Blueprint):
+
+| Resource | What it is |
+|---|---|
+| `fellow-db` | Free PostgreSQL 16 in Singapore |
+| `fellow-hrms-api` | The FastAPI backend, built from `backend/Dockerfile`; migrations and demo data run on start |
+| `fellow-hrms` | The React app as a static site; `/api/*` is rewritten to the API, everything else to `index.html` |
+
+Each service only redeploys when its own folder changes, so the CI bot's staging commits do not trigger deploys.
+To reproduce it: Render dashboard → **New → Blueprint** → pick this repository → **Apply**.
+
+| URL | |
+|---|---|
+| https://fellow-hrms.onrender.com | the app |
+| https://fellow-hrms-api.onrender.com/docs | Swagger API docs |
+| https://fellow-hrms-api.onrender.com/health | liveness |
+
 ## Screenshots
 
 | | |
@@ -372,6 +394,7 @@ Browser screenshots are captured live from the running stack with [`tools/screen
 
 ## Known issues and limitations
 
+- **Render free tier.** The API spins down after 15 minutes without traffic and takes about a minute to wake up, and the free database expires 30 days after creation (with a 14 day grace period).
 - **EKS runs on kind locally.** LocalStack's free edition has no EKS, so Kubernetes runs on a local kind cluster created by Terraform. The EKS Terraform code is planned but has not been applied to a real AWS account, to avoid cost.
 - **LocalStack is pinned to `4.14`,** the last community image that starts without an account. Newer images need a free auth token (see `terraform/localstack/docker-compose.yml`).
 - **ingress-nginx is retired upstream** (maintenance ended in March 2026). It works for this demo; a production setup would move to the Gateway API or another controller such as Traefik.
