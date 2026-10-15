@@ -2,13 +2,12 @@
 // Usage: npm run capture -- [name ...]   (no names = everything)
 import { chromium } from 'playwright-core';
 import { execSync } from 'node:child_process';
-import { readFileSync, readdirSync, mkdirSync } from 'node:fs';
-import { dirname, join, basename } from 'node:path';
+import { mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const outDir = join(root, 'docs', 'screenshots');
-const termDir = join(outDir, 'terminal');
 mkdirSync(outDir, { recursive: true });
 
 const sh = (cmd) => {
@@ -41,20 +40,6 @@ const pages = [
   { name: 'github-packages', url: `https://github.com/${repo.split('/')[0]}?tab=packages`, wait: 3000 },
 ];
 
-const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const terminalHtml = (title, text) => {
-  const [first, ...rest] = text.split('\n');
-  return `<!doctype html><html><body style="margin:0;background:#0E141B;padding:24px">
-  <div id="t" style="display:inline-block;min-width:900px;border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4);border:1px solid #304252">
-    <div style="background:#1D2A35;padding:10px 14px;display:flex;gap:8px;align-items:center;font:600 13px -apple-system,Segoe UI,sans-serif;color:#9BA8B2">
-      <span style="width:12px;height:12px;border-radius:50%;background:#FF5F57"></span>
-      <span style="width:12px;height:12px;border-radius:50%;background:#FEBC2E"></span>
-      <span style="width:12px;height:12px;border-radius:50%;background:#28C840"></span>
-      <span style="margin-left:10px">${escape(title)}</span></div>
-    <pre style="margin:0;padding:16px 18px;background:#16212B;color:#EEF2F4;font:13px/1.5 'SF Mono',Menlo,monospace;white-space:pre"><span style="color:#6FBFD1">${escape(first)}</span>
-${escape(rest.join('\n'))}</pre></div></body></html>`;
-};
-
 const only = process.argv.slice(2);
 const want = (name) => only.length === 0 || only.includes(name);
 
@@ -83,18 +68,6 @@ try {
     await context.close();
   }
 
-  const files = readdirSync(termDir).filter((f) => f.endsWith('.txt') && want(basename(f, '.txt')));
-  if (files.length) {
-    const context = await browser.newContext({ deviceScaleFactor: 2, viewport: { width: 1600, height: 900 } });
-    const page = await context.newPage();
-    for (const f of files) {
-      const name = basename(f, '.txt');
-      await page.setContent(terminalHtml(name, readFileSync(join(termDir, f), 'utf8').trimEnd()));
-      await page.locator('#t').screenshot({ path: join(outDir, `terminal-${name}.png`) });
-      console.log(`captured terminal-${name}`);
-    }
-    await context.close();
-  }
 } finally {
   await browser.close();
 }

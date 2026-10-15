@@ -1,4 +1,0 @@
-$ helm list -A
-NAME      	NAMESPACE 	REVISION	UPDATED                             	STATUS  	CHART                       	APP VERSION
-fellow    	fellow    	2       	2026-10-15 19:42:46.9602 +0530 IST  	deployed	fellow-0.1.0                	1.0.0      
-monitoring	monitoring	1       	2026-10-15 19:38:50.057184 +0530 IST	deployed	kube-prometheus-stack-92.8.0	v0.94.1    

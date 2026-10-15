@@ -30,3 +30,6 @@ crash.log
 .idea/
 .vscode/
 *.log
+
+# Raw command output recorded for screenshots
+docs/screenshots/terminal/

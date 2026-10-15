@@ -1,5 +1,0 @@
-$ docker compose ps
-NAME              IMAGE                COMMAND                  SERVICE    CREATED         STATUS                   PORTS
-hrms-backend-1    hrms-backend         "docker-entrypoint.s…"   backend    7 minutes ago   Up 7 minutes (healthy)   0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
-hrms-frontend-1   hrms-frontend        "/docker-entrypoint.…"   frontend   7 minutes ago   Up 7 minutes             0.0.0.0:3000->8080/tcp, [::]:3000->8080/tcp
-hrms-postgres-1   postgres:16-alpine   "docker-entrypoint.s…"   postgres   7 minutes ago   Up 7 minutes (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp

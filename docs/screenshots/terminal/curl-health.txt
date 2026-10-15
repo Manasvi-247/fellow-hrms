@@ -1,3 +1,0 @@
-$ curl -s http://localhost:8000/health; echo; curl -s http://localhost:8000/ready; echo
-{"status":"UP"}
-{"status":"READY"}
