@@ -51,3 +51,7 @@ serviceMonitor:
   enabled: false
   interval: 15s
   labels: {}
+
+# ConfigMap picked up by the Grafana dashboard sidecar of kube-prometheus-stack.
+grafanaDashboard:
+  enabled: false

@@ -9,3 +9,5 @@ serviceMonitor:
   enabled: true
   labels:
     release: monitoring
+grafanaDashboard:
+  enabled: true
