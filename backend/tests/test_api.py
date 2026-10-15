@@ -14,7 +14,7 @@ def test_ready_checks_database(client):
 
 def test_root_reports_service(client):
     body = client.get("/").json()
-    assert body["service"] == "HRMS API"
+    assert body["service"] == "Fellow API"
     assert body["docs"] == "/docs"
 
 
@@ -278,9 +278,22 @@ def test_seed_is_idempotent(client):
         assert seed(db) is False
     employees = client.get("/api/employees").json()
     assert len(employees) == 25
-    assert len(client.get("/api/departments").json()) == 5
+    assert sum(e["status"] == "EXITED" for e in employees) == 1
+    admin = client.get("/api/employees/1").json()
+    assert (admin["first_name"], admin["last_name"], admin["role"]) == ("Manasvi", "Sabbarwal", "ADMIN")
+    departments = {d["code"]: d for d in client.get("/api/departments").json()}
+    assert set(departments) == {"ENG", "SLS", "DSN", "HR", "FIN"}
+    assert departments["HR"]["name"] == "People Ops"
+    assert departments["HR"]["head_id"] == 1
+    assert [t["code"] for t in client.get("/api/leave-types").json()] == ["CL", "SL", "EL"]
+    assert len(client.get("/api/holidays", params={"year": 2026}).json()) == 15
     stats = client.get("/api/dashboard/stats").json()
     assert stats["pending_leaves"] == 5
+    holidays = {date.fromisoformat(h["date"]) for h in client.get("/api/holidays", params={"year": 2026}).json()}
+    for leave in client.get("/api/leaves", params={"status": "PENDING"}).json():
+        start = date.fromisoformat(leave["from_date"])
+        assert start.weekday() < 5 and start not in holidays
+        assert leave["days"] > 0
 
 
 def test_list_endpoints_do_not_issue_a_query_per_row(client, make_employee, leave_type, next_monday):
