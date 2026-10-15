@@ -15,15 +15,17 @@ const sh = (cmd) => {
 };
 const grafanaPassword = sh("kubectl get secret grafana-admin -n monitoring -o jsonpath='{.data.admin-password}' | base64 -d");
 const repo = 'Manasvi-247/fellow-hrms';
+const app = process.env.APP_URL || 'http://fellow.localhost';
 const latestRun = sh(`gh run list -R ${repo} --limit 1 --json databaseId --jq '.[0].databaseId'`);
 
 const pages = [
-  { name: 'app-dashboard', url: 'http://fellow.localhost/', wait: 2500 },
-  { name: 'app-employees', url: 'http://fellow.localhost/employees', wait: 2500 },
-  { name: 'app-leave', url: 'http://fellow.localhost/leave', wait: 2500 },
-  { name: 'app-attendance', url: 'http://fellow.localhost/attendance', wait: 2500 },
-  { name: 'app-dark', url: 'http://fellow.localhost/', wait: 2500, dark: true },
-  { name: 'app-mobile', url: 'http://fellow.localhost/', wait: 2500, mobile: true },
+  { name: 'app-dashboard', url: `${app}/`, wait: 2500 },
+  { name: 'app-employees', url: `${app}/employees`, wait: 2500 },
+  { name: 'app-leave', url: `${app}/leave/approvals`, wait: 2500 },
+  { name: 'app-attendance', url: `${app}/attendance`, wait: 2500 },
+  { name: 'app-dark', url: `${app}/`, wait: 2500, dark: true },
+  { name: 'app-profile', url: `${app}/employees/12`, wait: 2500 },
+  { name: 'app-mobile', url: `${app}/`, wait: 2500, mobile: true },
   { name: 'api-swagger', url: 'http://localhost:8000/docs', wait: 2500 },
   { name: 'api-metrics', url: 'http://localhost:8000/metrics', wait: 500, height: 900 },
   { name: 'prometheus-targets', url: 'http://prometheus.localhost/targets?pool=serviceMonitor%2Ffellow%2Ffellow-backend%2F0', wait: 3000 },
