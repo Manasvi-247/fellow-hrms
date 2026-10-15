@@ -11,6 +11,7 @@ import {
   UserIcon,
   XIcon,
 } from '@phosphor-icons/react';
+import { Navigate, useParams } from 'react-router-dom';
 import * as api from '../api.js';
 import { useApp } from '../state.jsx';
 import { useLoad, useViewport } from '../lib/hooks.js';
@@ -206,9 +207,12 @@ function AllRequests() {
 }
 
 export default function Leave() {
-  const { route, go, canApprove, isAdmin, pendingFor, openModal } = useApp();
-  let tab = route.tab || 'mine';
-  if ((tab === 'approvals' && !canApprove) || (tab === 'all' && !isAdmin) || !['mine', 'approvals', 'all'].includes(tab)) tab = 'mine';
+  const { go, canApprove, isAdmin, pendingFor, openModal } = useApp();
+  const { tab: param } = useParams();
+  if (param && (!['approvals', 'all'].includes(param) || (param === 'approvals' && !canApprove) || (param === 'all' && !isAdmin))) {
+    return <Navigate to="/leave" replace />;
+  }
+  const tab = param || 'mine';
   const tabs = [
     { id: 'mine', label: 'My leave', Icon: UserIcon },
     canApprove && { id: 'approvals', label: 'Approvals', Icon: CheckSquareOffsetIcon, badge: pendingFor.length },

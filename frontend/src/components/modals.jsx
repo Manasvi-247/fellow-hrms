@@ -23,7 +23,6 @@ import {
   todayISO,
 } from '../lib/dates.js';
 import { fullName, leaveStyle } from '../lib/ui.js';
-import { Avatar, EmployeeStatus } from './common.jsx';
 import { ConfirmBody, DialogFoot, DialogHead, Field, Modal } from './Modal.jsx';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -512,7 +511,7 @@ export function DepartmentForm({ department }) {
 const membersOf = (employees, dept) => employees.filter((e) => e.department_id === dept.id);
 
 export function DeleteDepartment({ department }) {
-  const { core, closeModal, openModal, run } = useApp();
+  const { core, closeModal, run, go, route } = useApp();
   const [busy, setBusy] = useState(false);
   const members = membersOf(core.employees, department);
   if (members.length) {
@@ -526,7 +525,14 @@ export function DeleteDepartment({ department }) {
         actions={
           <>
             <button type="button" className="btn btn-secondary" onClick={closeModal}>Got it</button>
-            <button type="button" className="btn btn-primary" onClick={() => openModal('deptMembers', { department })}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                closeModal();
+                go(`/departments/${department.id}`);
+              }}
+            >
               View members
             </button>
           </>
@@ -538,7 +544,10 @@ export function DeleteDepartment({ department }) {
     setBusy(true);
     const r = await run(() => api.deleteDepartment(department.id), `${department.name} department deleted`, 'bad');
     setBusy(false);
-    if (r.ok) closeModal();
+    if (r.ok) {
+      closeModal();
+      if (route.page === 'department') go('/departments');
+    }
   };
   return (
     <ConfirmBody
@@ -553,38 +562,6 @@ export function DeleteDepartment({ department }) {
         </>
       }
     />
-  );
-}
-
-export function DepartmentMembers({ department }) {
-  const { core, closeModal, go } = useApp();
-  const members = membersOf(core.employees, department)
-    .filter((e) => e.status !== 'EXITED')
-    .sort((a, b) => (a.id === department.head_id ? -1 : b.id === department.head_id ? 1 : fullName(a).localeCompare(fullName(b))));
-  const open = (e) => {
-    closeModal();
-    go(`/employees/${e.id}`);
-  };
-  return (
-    <>
-      <DialogHead title={department.name} sub={`${department.code} · ${plural(members.length, 'person', 'people')}`} onClose={closeModal} />
-      <div className="stack gap-4 members-list">
-        {members.map((e) => (
-          <button key={e.id} type="button" className="person-row" onClick={() => open(e)}>
-            <Avatar emp={e} />
-            <span className="grow">
-              <span className="row gap-6 title-sm">
-                {fullName(e)}
-                {e.id === department.head_id && <span className="head-tag tone-lilac">Head</span>}
-              </span>
-              <span className="sub block">{e.designation}</span>
-            </span>
-            <EmployeeStatus status={e.status} />
-          </button>
-        ))}
-        {!members.length && <div className="mini-empty fs-14">No one in this department yet.</div>}
-      </div>
-    </>
   );
 }
 
@@ -670,7 +647,6 @@ const MODALS = {
   deleteEmployee: [DeleteEmployee, null, 'Delete employee'],
   department: [DepartmentForm, '520', 'Department form'],
   deleteDepartment: [DeleteDepartment, null, 'Delete department'],
-  deptMembers: [DepartmentMembers, '560', 'Department members'],
   holiday: [HolidayForm, '480', 'Add holiday'],
   deleteHoliday: [DeleteHoliday, null, 'Remove holiday'],
 };

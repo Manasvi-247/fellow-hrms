@@ -22,6 +22,7 @@ import {
   UserCircleIcon,
   UserFocusIcon,
 } from '@phosphor-icons/react';
+import { Navigate, useParams } from 'react-router-dom';
 import * as api from '../api.js';
 import { useApp } from '../state.jsx';
 import { useLoad, useViewport } from '../lib/hooks.js';
@@ -80,10 +81,12 @@ function KV({ rows }) {
 }
 
 export default function Profile() {
-  const { route, go, core, byId, viewer, isAdmin, version, openModal, run } = useApp();
+  const { go, core, byId, viewer, isAdmin, version, openModal, run } = useApp();
   const { isMobile } = useViewport();
-  const id = route.id;
-  const tab = TABS.some((t) => t.id === route.tab) ? route.tab : 'overview';
+  const params = useParams();
+  const id = Number(params.id);
+  const validTab = !params.tab || TABS.some((t) => t.id === params.tab);
+  const tab = params.tab && validTab ? params.tab : 'overview';
   const month = todayISO().slice(0, 7);
   const emp = useLoad(() => api.getEmployee(id), [id, version]);
   const balances = useLoad(() => (tab === 'leave' ? api.getLeaveBalance(id) : null), [id, tab, version]);
@@ -91,13 +94,15 @@ export default function Profile() {
   const att = useLoad(() => (tab === 'attendance' ? api.getAttendanceMonth(id, month) : null), [id, tab, month, version]);
   const reports = useLoad(() => (tab === 'team' ? api.getDirectReports(id) : null), [id, tab, version]);
 
-  if (emp.error?.status === 404) {
+  if (!validTab) return <Navigate to={`/employees/${params.id}`} replace />;
+  if (!Number.isInteger(id) || emp.error?.status === 404) {
     return (
       <EmptyState
         Icon={UserFocusIcon}
         title="Profile not found"
         body="This person may have been removed from the directory."
         cta="Back to employees"
+        CtaIcon={ArrowLeftIcon}
         onCta={() => go('/employees')}
       />
     );
@@ -176,7 +181,7 @@ export default function Profile() {
         </div>
       </section>
 
-      <Seg label="Profile sections" items={TABS} value={tab} onChange={(t) => go(`/employees/${id}/${t}`)} />
+      <Seg label="Profile sections" items={TABS} value={tab} onChange={(t) => go(t === 'overview' ? `/employees/${id}` : `/employees/${id}/${t}`)} />
 
       {tab === 'overview' && (
         <div className="grid-auto g-360 fade-in">

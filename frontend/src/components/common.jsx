@@ -146,7 +146,7 @@ export function ErrorState({ error, what, onRetry }) {
   );
 }
 
-export function EmptyState({ Icon, title, body, cta, onCta }) {
+export function EmptyState({ Icon, title, body, cta, onCta, CtaIcon = PlusIcon }) {
   return (
     <div className="state-card">
       <span className="empty-icon"><Icon /></span>
@@ -154,7 +154,7 @@ export function EmptyState({ Icon, title, body, cta, onCta }) {
       <p>{body}</p>
       {cta && (
         <button type="button" className="btn btn-primary mt-8" onClick={onCta}>
-          <PlusIcon />
+          <CtaIcon />
           {cta}
         </button>
       )}

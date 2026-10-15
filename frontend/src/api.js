@@ -56,6 +56,7 @@ export const getDirectReports = (id) => get(`/api/employees/${id}/reports`);
 export const getLeaveBalance = (id, year) => get(`/api/employees/${id}/leave-balance`, { year });
 
 export const listDepartments = () => get('/api/departments');
+export const getDepartment = (id) => get(`/api/departments/${id}`);
 export const createDepartment = (data) => post('/api/departments', data);
 export const updateDepartment = (id, data) => put(`/api/departments/${id}`, data);
 export const deleteDepartment = (id) => del(`/api/departments/${id}`);

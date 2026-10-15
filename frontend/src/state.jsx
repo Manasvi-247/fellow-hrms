@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import * as api from './api.js';
 import { todayISO } from './lib/dates.js';
 import { VIEWER_PRESETS } from './lib/ui.js';
@@ -6,12 +7,17 @@ import { VIEWER_PRESETS } from './lib/ui.js';
 const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
 
-const PAGES = ['dashboard', 'employees', 'departments', 'leave', 'attendance', 'holidays'];
+const PAGES = ['employees', 'departments', 'leave', 'attendance', 'holidays'];
 
-function parseHash() {
-  const [page = 'dashboard', a, b] = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
-  if (page === 'employees' && a) return { page: 'profile', id: Number(a), tab: b || 'overview' };
-  return { page: PAGES.includes(page) ? page : 'dashboard', tab: a || null };
+export function parsePath(pathname) {
+  const [page, a, b, ...rest] = pathname.split('/').filter(Boolean);
+  if (!page) return { page: 'dashboard' };
+  if (!PAGES.includes(page) || rest.length) return { page: 'notfound' };
+  const id = /^\d+$/.test(a || '') ? Number(a) : null;
+  if (page === 'employees' && a) return id ? { page: 'profile', id, tab: b || 'overview' } : { page: 'notfound' };
+  if (page === 'departments' && a) return id && !b ? { page: 'department', id } : { page: 'notfound' };
+  if (page === 'leave') return b ? { page: 'notfound' } : { page, tab: a || null };
+  return a ? { page: 'notfound' } : { page };
 }
 
 function readStore(key, fallback) {
@@ -39,7 +45,9 @@ export function initialTheme() {
 const EMPTY_CORE = { employees: [], departments: [], leaveTypes: [], holidays: [], pending: [] };
 
 export function AppProvider({ children }) {
-  const [route, setRoute] = useState(parseHash);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const route = useMemo(() => parsePath(location.pathname), [location.pathname]);
   const [theme, setTheme] = useState(initialTheme);
   const [core, setCore] = useState({ status: 'loading', error: null, ...EMPTY_CORE });
   const [version, setVersion] = useState(0);
@@ -51,14 +59,13 @@ export function AppProvider({ children }) {
   const coreSeq = useRef(0);
 
   useEffect(() => {
-    const onHash = () => {
-      setRoute(parseHash());
-      setDrawer(false);
-      window.scrollTo(0, 0);
-    };
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
-  }, []);
+    if (window.location.hash.startsWith('#/')) navigate(window.location.hash.slice(1), { replace: true });
+  }, [navigate]);
+
+  useEffect(() => {
+    setDrawer(false);
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   useEffect(() => {
     writeStore('fellow-sidebar', collapsed ? '1' : '0');
@@ -125,13 +132,13 @@ export function AppProvider({ children }) {
     [toast, refresh],
   );
 
-  const go = useCallback((path) => {
-    const next = `#${path}`;
-    if (window.location.hash === next) {
+  const go = useCallback(
+    (path, options) => {
       setDrawer(false);
-      window.scrollTo(0, 0);
-    } else window.location.hash = next;
-  }, []);
+      navigate(path, options);
+    },
+    [navigate],
+  );
 
   const derived = useMemo(() => {
     const { employees, pending } = core;

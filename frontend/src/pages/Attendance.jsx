@@ -12,6 +12,7 @@ import {
   SignOutIcon,
   XCircleIcon,
 } from '@phosphor-icons/react';
+import { useSearchParams } from 'react-router-dom';
 import * as api from '../api.js';
 import { useApp } from '../state.jsx';
 import { useLoad, useViewport } from '../lib/hooks.js';
@@ -87,7 +88,10 @@ function Board({ day }) {
   const { core, byId, version, go } = useApp();
   const { isMobile } = useViewport();
   const today = day.today;
-  const [date, setDate] = useState(today);
+  const [params, setParams] = useSearchParams();
+  const asked = params.get('date') || '';
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : today;
+  const setDate = (d) => setParams(d === today ? {} : { date: d }, { replace: true });
   const [dept, setDept] = useState('');
   const [status, setStatus] = useState('');
   const board = useLoad(() => api.getAttendanceBoard(date, dept), [date, dept, version]);

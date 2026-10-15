@@ -7,7 +7,7 @@ import { TONES4, deptIcon, fullName } from '../lib/ui.js';
 import { Avatar, EmptyState, ErrorState, Skeleton } from '../components/common.jsx';
 
 export default function Departments() {
-  const { core, live, byId, isAdmin, version, openModal } = useApp();
+  const { core, live, byId, isAdmin, version, openModal, go } = useApp();
   const depts = useLoad(api.listDepartments, [version]);
 
   if (depts.error) return <ErrorState error={depts.error} what="departments" onRetry={depts.reload} />;
@@ -24,7 +24,7 @@ export default function Departments() {
     );
   }
 
-  const openMembers = (d) => openModal('deptMembers', { department: d });
+  const openMembers = (d) => go(`/departments/${d.id}`);
   return (
     <div className="page page-tight">
       <div className="toolbar">
