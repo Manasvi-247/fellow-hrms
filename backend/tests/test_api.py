@@ -317,3 +317,11 @@ def test_list_endpoints_do_not_issue_a_query_per_row(client, make_employee, leav
             assert len(statements) <= 5, (path, len(statements))
     finally:
         event.remove(engine, "before_cursor_execute", listener)
+
+
+def test_hosted_postgres_urls_use_the_psycopg_driver():
+    from app.config import Settings
+
+    for url in ("postgres://u:p@db/fellow", "postgresql://u:p@db/fellow"):
+        assert Settings(database_url=url).database_url == "postgresql+psycopg://u:p@db/fellow"
+    assert Settings(database_url="sqlite:///./x.db").database_url == "sqlite:///./x.db"
