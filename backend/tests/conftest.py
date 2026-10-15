@@ -1,5 +1,5 @@
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 os.environ["DATABASE_URL"] = "sqlite:///./test.db"
 
@@ -74,3 +74,16 @@ def leave_type():
 def next_monday():
     today = date.today()
     return today + timedelta(days=(7 - today.weekday()) % 7 or 7) + timedelta(days=7)
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    from app.routers import attendance
+    from app.services import TZ
+
+    def _set(day: date, hour: int, minute: int):
+        moment = datetime(day.year, day.month, day.day, hour, minute, tzinfo=TZ)
+        monkeypatch.setattr(attendance, "now_local", lambda: moment)
+        monkeypatch.setattr(attendance, "today_local", lambda: moment.date())
+
+    return _set

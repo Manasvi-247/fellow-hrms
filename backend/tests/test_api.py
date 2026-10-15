@@ -49,6 +49,25 @@ class TestDepartments:
         assert updated["headcount"] == 2
 
 
+class TestPartialUpdates:
+    def test_employee_rejects_null_for_required_fields(self, client, make_employee):
+        emp = make_employee()
+        response = client.put(f"/api/employees/{emp['id']}", json={"email": None, "salary": None})
+        assert response.status_code == 422
+        assert "email, salary cannot be null" in response.text
+
+    def test_employee_allows_clearing_optional_fields(self, client, make_employee):
+        boss = make_employee(role="MANAGER")
+        emp = make_employee(manager_id=boss["id"])
+        updated = client.put(f"/api/employees/{emp['id']}", json={"manager_id": None, "department_id": None})
+        assert updated.status_code == 200
+        assert updated.json()["manager_id"] is None and updated.json()["department_name"] is None
+
+    def test_department_rejects_null_name(self, client, department):
+        response = client.put(f"/api/departments/{department['id']}", json={"name": None})
+        assert response.status_code == 422
+
+
 class TestEmployees:
     def test_create_generates_code_and_department_name(self, make_employee):
         emp = make_employee()
@@ -159,6 +178,17 @@ class TestLeave:
         balance = client.get(f"/api/employees/{employee['id']}/leave-balance").json()[0]
         assert balance["used"] == 0.5 and balance["available"] == 11.5
 
+    def test_half_day_on_weekend_rejected(self, client, make_employee, leave_type, next_monday):
+        emp = make_employee()
+        saturday = next_monday + timedelta(days=5)
+        response = client.post(
+            "/api/leaves",
+            json={"employee_id": emp["id"], "leave_type_id": leave_type["id"],
+                  "from_date": str(saturday), "to_date": str(saturday), "half_day": True},
+        )
+        assert response.status_code == 400
+        assert "weekends or holidays" in response.json()["detail"]
+
     def test_cancel_pending(self, client, make_employee, leave_type, next_monday):
         emp = make_employee()
         leave = client.post(
@@ -171,46 +201,75 @@ class TestLeave:
 
 
 class TestAttendance:
-    def at(self, day: date, hh: int, mm: int) -> str:
-        return datetime(day.year, day.month, day.day, hh, mm, tzinfo=timezone(timedelta(hours=5, minutes=30))).isoformat()
+    WEDNESDAY = date(2026, 10, 14)
 
-    def test_on_time_check_in_and_check_out(self, client, make_employee):
+    def test_on_time_check_in_and_check_out(self, client, make_employee, clock):
         emp = make_employee()
-        day = date(2026, 10, 14)
-        record = client.post("/api/attendance/check-in", json={"employee_id": emp["id"], "at": self.at(day, 9, 5)})
+        clock(self.WEDNESDAY, 9, 5)
+        record = client.post("/api/attendance/check-in", json={"employee_id": emp["id"]})
         assert record.status_code == 201
         assert record.json()["status"] == "PRESENT"
-        out = client.post("/api/attendance/check-out", json={"employee_id": emp["id"], "at": self.at(day, 18, 35)})
+        clock(self.WEDNESDAY, 18, 35)
+        out = client.post("/api/attendance/check-out", json={"employee_id": emp["id"]})
         assert out.json()["hours_worked"] == 9.5
 
-    def test_late_and_duplicate_check_in(self, client, make_employee):
+    def test_late_and_duplicate_check_in(self, client, make_employee, clock):
         emp = make_employee()
-        day = date(2026, 10, 14)
-        body = {"employee_id": emp["id"], "at": self.at(day, 9, 45)}
+        clock(self.WEDNESDAY, 9, 45)
+        body = {"employee_id": emp["id"]}
         assert client.post("/api/attendance/check-in", json=body).json()["status"] == "LATE"
         assert client.post("/api/attendance/check-in", json=body).status_code == 409
 
-    def test_check_out_without_check_in(self, client, make_employee):
+    def test_client_cannot_choose_check_in_time(self, client, make_employee, clock):
         emp = make_employee()
-        response = client.post("/api/attendance/check-out", json={"employee_id": emp["id"], "at": self.at(date(2026, 10, 14), 18, 0)})
-        assert response.status_code == 409
+        clock(self.WEDNESDAY, 10, 15)
+        forged = {"employee_id": emp["id"], "at": f"{self.WEDNESDAY}T09:00:00+05:30"}
+        record = client.post("/api/attendance/check-in", json=forged).json()
+        assert record["status"] == "LATE"
+        assert record["check_in"].startswith(f"{self.WEDNESDAY}T10:15")
 
-    def test_daily_board_marks_absent(self, client, make_employee):
+    def test_check_out_without_check_in(self, client, make_employee, clock):
+        emp = make_employee()
+        clock(self.WEDNESDAY, 18, 0)
+        response = client.post("/api/attendance/check-out", json={"employee_id": emp["id"]})
+        assert response.status_code == 409
+        assert response.json()["detail"] == "You have not checked in today"
+
+    def test_check_out_after_midnight_closes_previous_day(self, client, make_employee, clock):
+        emp = make_employee()
+        clock(self.WEDNESDAY, 21, 0)
+        client.post("/api/attendance/check-in", json={"employee_id": emp["id"]})
+        clock(self.WEDNESDAY + timedelta(days=1), 0, 30)
+        out = client.post("/api/attendance/check-out", json={"employee_id": emp["id"]})
+        assert out.status_code == 200, out.text
+        assert out.json()["date"] == str(self.WEDNESDAY)
+        assert out.json()["hours_worked"] == 3.5
+
+    def test_daily_board_marks_absent(self, client, make_employee, clock):
         present = make_employee()
         absent = make_employee()
-        day = date(2026, 10, 14)
-        client.post("/api/attendance/check-in", json={"employee_id": present["id"], "at": self.at(day, 9, 0)})
-        board = {r["employee_id"]: r["status"] for r in client.get("/api/attendance", params={"date": str(day)}).json()}
+        clock(self.WEDNESDAY, 9, 0)
+        client.post("/api/attendance/check-in", json={"employee_id": present["id"]})
+        board = {r["employee_id"]: r["status"] for r in client.get("/api/attendance", params={"date": str(self.WEDNESDAY)}).json()}
         assert board == {present["id"]: "PRESENT", absent["id"]: "ABSENT"}
+
+    def test_daily_board_has_no_absences_on_non_working_or_future_days(self, client, make_employee, clock):
+        make_employee()
+        clock(self.WEDNESDAY, 12, 0)
+        client.post("/api/holidays", json={"name": "Festival", "date": str(self.WEDNESDAY - timedelta(days=1))})
+        for day in (self.WEDNESDAY - timedelta(days=4), self.WEDNESDAY - timedelta(days=1), self.WEDNESDAY + timedelta(days=1)):
+            assert client.get("/api/attendance", params={"date": str(day)}).json() == [], day
 
 
 def test_dashboard_stats(client, make_employee):
     make_employee()
     make_employee(status="EXITED")
+    make_employee(date_of_joining=str(date.today() + timedelta(days=40)))
     stats = client.get("/api/dashboard/stats").json()
     assert stats["total_employees"] == 1
     assert stats["headcount_by_department"] == [{"department": "Engineering", "count": 1}]
     assert stats["pending_leaves"] == 0
+    assert stats["absent_today"] <= 1
 
 
 def test_seed_is_idempotent(client):
@@ -221,4 +280,27 @@ def test_seed_is_idempotent(client):
     assert len(employees) == 25
     assert len(client.get("/api/departments").json()) == 5
     stats = client.get("/api/dashboard/stats").json()
-    assert stats["pending_leaves"] >= 4
+    assert stats["pending_leaves"] == 5
+
+
+def test_list_endpoints_do_not_issue_a_query_per_row(client, make_employee, leave_type, next_monday):
+    from sqlalchemy import event
+
+    from app.db import engine
+
+    boss = make_employee(role="MANAGER")
+    for _ in range(6):
+        emp = make_employee(manager_id=boss["id"])
+        client.post("/api/leaves", json={"employee_id": emp["id"], "leave_type_id": leave_type["id"],
+                                         "from_date": str(next_monday), "to_date": str(next_monday)})
+
+    statements = []
+    listener = lambda *args: statements.append(args[2])
+    event.listen(engine, "before_cursor_execute", listener)
+    try:
+        for path in ("/api/employees", "/api/leaves", "/api/departments"):
+            statements.clear()
+            client.get(path)
+            assert len(statements) <= 5, (path, len(statements))
+    finally:
+        event.remove(engine, "before_cursor_execute", listener)
