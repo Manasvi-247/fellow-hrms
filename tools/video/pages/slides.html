@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #1F2A3C; }
+  .slide { position: absolute; inset: 0; opacity: 0; transition: opacity .7s ease; }
+  .slide img { width: 100%; height: 100%; display: block; transform-origin: 60% 45%; }
+  .slide.on { opacity: 1; }
+  .slide.on img { animation: kb var(--d) linear forwards; }
+  @keyframes kb { from { transform: scale(1); } to { transform: scale(1.045); } }
+</style>
+</head>
+<body>
+<script>
+  const q = new URLSearchParams(location.search);
+  const list = (q.get('s') || '1').split(',');
+  const dur = Number(q.get('d') || 5000);
+  document.body.style.setProperty('--d', dur + 'ms');
+  const nodes = list.map((n) => {
+    const d = document.createElement('div');
+    d.className = 'slide';
+    d.innerHTML = `<img src="../build/slides/slide-${String(n).padStart(2, '0')}.png">`;
+    document.body.appendChild(d);
+    return d;
+  });
+  window.slideCount = nodes.length;
+  window.show = (i) => nodes.forEach((n, j) => n.classList.toggle('on', i === j));
+</script>
+</body>
+</html>
