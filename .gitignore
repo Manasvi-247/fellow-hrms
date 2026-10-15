@@ -33,3 +33,6 @@ crash.log
 
 # Raw command output recorded for screenshots
 docs/screenshots/terminal/
+
+# kubeconfig written by the kind Terraform provider
+terraform/*-config
