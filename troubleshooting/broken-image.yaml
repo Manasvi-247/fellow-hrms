@@ -1,0 +1,32 @@
+# Lab 1: the image tag does not exist, so the pod never starts.
+# Symptom: ImagePullBackOff / ErrImagePull. Investigate with kubectl describe pod and kubectl get events.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fellow-broken-image
+  namespace: fellow
+  labels:
+    lab: troubleshooting
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fellow-broken-image
+  template:
+    metadata:
+      labels:
+        app: fellow-broken-image
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: backend
+          image: ghcr.io/manasvi-247/hrms-backend:does-not-exist
+          ports:
+            - containerPort: 8000
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]

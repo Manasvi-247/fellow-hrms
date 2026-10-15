@@ -1,0 +1,17 @@
+# Lab 2: the selector does not match the backend pod labels, so the Service has no endpoints.
+# Symptom: requests to the Service hang or are refused. Compare kubectl get endpoints with kubectl get pods --show-labels.
+apiVersion: v1
+kind: Service
+metadata:
+  name: fellow-broken-service
+  namespace: fellow
+  labels:
+    lab: troubleshooting
+spec:
+  selector:
+    app.kubernetes.io/name: fellow-backend
+    app.kubernetes.io/instance: fellow
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
