@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
-alembic upgrade head
-if [ "${SEED_DEMO_DATA:-false}" = "true" ]; then
-  python -m app.seed
+# Set RUN_MIGRATIONS=false when a separate job (for example a Helm hook) owns migrations.
+if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
+  python -m app.bootstrap
 fi
 exec "$@"
