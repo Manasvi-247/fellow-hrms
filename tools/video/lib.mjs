@@ -29,6 +29,7 @@ const OVERLAY = () => {
   .fx-root{position:fixed;inset:0;pointer-events:none;z-index:2147483647;font-family:'Roboto Mono',ui-monospace,monospace}
   .fx-cursor{position:fixed;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;background:rgba(76,157,176,.35);border:3px solid #2E7A8C;box-shadow:0 0 0 6px rgba(255,255,255,.55);transition:transform .12s ease,background .12s}
   .fx-cursor.down{transform:scale(.7);background:rgba(255,189,197,.8)}
+  .fx-bubble-wrap,.fx-sticker,.fx-chip{zoom:var(--fx-k,1)}
   .fx-bubble-wrap{position:fixed;left:56px;bottom:64px;max-width:1040px;transform-origin:left bottom}
   .fx-tag{display:inline-block;margin:0 0 -6px 18px;padding:6px 16px;border:3px solid #1B1A24;border-radius:12px;font-weight:800;font-size:20px;letter-spacing:.12em;text-transform:uppercase;transform:rotate(-3deg);position:relative;z-index:2;box-shadow:4px 4px 0 #1B1A24}
   .fx-bubble{position:relative;background:#fff;color:#1B1A24;border:4px solid #1B1A24;border-radius:26px;padding:20px 30px 22px 26px;font-weight:700;font-size:31px;line-height:1.32;box-shadow:10px 10px 0 #1B1A24;transform:rotate(-1.2deg);display:flex;gap:18px;align-items:flex-start}
@@ -42,7 +43,7 @@ const OVERLAY = () => {
   .fx-sticker img{width:100%;display:block;border-radius:14px}
   .fx-sticker.out{animation:fxOut .35s ease-in both}
   .fx-ring{position:fixed;border:5px solid #FFBDC5;border-radius:16px;box-shadow:0 0 0 4px #1B1A24,0 0 30px rgba(255,189,197,.9);animation:fxRing 1.1s ease-in-out infinite}
-  .fx-chip{position:fixed;right:44px;top:30px;padding:10px 18px;background:#1B1A24;color:#FFBDC5;border-radius:999px;font-weight:800;font-size:20px;letter-spacing:.08em;animation:fxPop .5s both}
+  .fx-chip{position:fixed;right:44px;bottom:40px;padding:10px 18px;background:#1B1A24;color:#FFBDC5;border-radius:999px;font-weight:800;font-size:20px;letter-spacing:.08em;animation:fxPop .5s both}
   @keyframes fxPop{0%{opacity:0;transform:scale(.4) rotate(-8deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
   @keyframes fxOut{to{opacity:0;transform:scale(.6) translateY(30px) rotate(6deg)}}
   @keyframes fxWord{to{opacity:1;transform:none}}
@@ -55,6 +56,7 @@ const OVERLAY = () => {
     document.head.appendChild(style);
     const root = document.createElement('div');
     root.className = 'fx-root';
+    root.style.setProperty('--fx-k', String(innerWidth / 1920));
     document.body.appendChild(root);
     const cursor = document.createElement('div');
     cursor.className = 'fx-cursor';
@@ -74,9 +76,9 @@ export async function launch() {
 
 export async function scene(browser, name, fn, opts = {}) {
   const context = await browser.newContext({
-    viewport: { width: W, height: H },
+    viewport: opts.viewport || { width: W, height: H },
     deviceScaleFactor: 1,
-    recordVideo: { dir: CLIPS, size: { width: W, height: H } },
+    recordVideo: { dir: CLIPS, size: opts.viewport || { width: W, height: H } },
     colorScheme: opts.dark ? 'dark' : 'light',
     extraHTTPHeaders: opts.headers,
   });
@@ -206,8 +208,9 @@ export async function ring(page, locator, hold = 1800, pad = 8) {
 
 let mouse = { x: W / 2, y: H / 2 };
 export async function moveTo(page, locator, steps = 28) {
+  await locator.waitFor({ state: 'visible', timeout: 10000 });
   const box = await locator.boundingBox();
-  if (!box) return;
+  if (!box) throw new Error('nothing to move to');
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
   await page.mouse.move(mouse.x, mouse.y);
@@ -216,7 +219,7 @@ export async function moveTo(page, locator, steps = 28) {
 }
 
 export async function click(page, locator, pause = 500) {
-  await locator.scrollIntoViewIfNeeded();
+  await locator.scrollIntoViewIfNeeded({ timeout: 4000 }).catch(() => {});
   await moveTo(page, locator);
   await sleep(250);
   await page.mouse.down();

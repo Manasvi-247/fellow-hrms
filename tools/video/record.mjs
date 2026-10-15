@@ -6,6 +6,8 @@ import {
 
 const REPO = 'https://github.com/Manasvi-247/fellow-hrms';
 const APP = 'http://fellow.localhost';
+const READ = { viewport: { width: 1280, height: 720 } };
+const APPVIEW = { viewport: { width: 1440, height: 810 } };
 const nav = (page, name) => page.locator('aside[aria-label="Main navigation"]').getByRole('button', { name, exact: true });
 const page_ = (file, params) => new URL(`./pages/${file}?${new URLSearchParams(params)}`, import.meta.url).href;
 const sh = (cmd) => execSync(cmd, { encoding: 'utf8' }).trim();
@@ -79,7 +81,7 @@ const SCENES = {
     await scene(b, 'app-tour', async ({ page, mark }) => {
       await page.addInitScript(() => { try { localStorage.setItem('fellow-theme', 'light'); localStorage.removeItem('fellow-sidebar'); } catch {} });
       await page.goto(`${APP}/`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load'); await sleep(1500);
       await chip(page, '01 · THE APP');
       mark();
       await say(page, { tag: 'Dashboard', text: 'Who is in, who is out, and what needs approving. Real data, straight from the API.', emoji: '👋', highlight: ['Real'], hold: 4200 });
@@ -99,13 +101,13 @@ const SCENES = {
       await click(page, page.getByText('Karan Shah').first(), 1800);
       await unsay(page);
       for (const tab of ['Leave', 'Attendance']) {
-        const t = page.locator('main').getByRole('button', { name: tab, exact: true }).first();
-        if (await t.count()) await click(page, t, 1600);
+        await click(page, page.locator('main button, main [role=tab]').filter({ hasText: new RegExp(`^\\s*${tab}\\s*$`) }).first(), 1800);
       }
       await sticker(page, 'glasses-cat', { x: 1600, y: 120, hold: 1800, size: 220 });
 
-      await page.goto(`${APP}/leave/approvals`);
-      await page.waitForLoadState('networkidle');
+      await click(page, nav(page, 'Leave').or(page.locator('aside[aria-label="Main navigation"]').getByRole('button', { name: /Leave/ })).first(), 1200);
+      const approvals = page.locator('main').getByRole('button', { name: /approvals/i }).first();
+      if (await approvals.count()) await click(page, approvals, 1200);
       await say(page, { tag: 'Leave', text: 'Managers approve or reject. Balances update, weekends and holidays never count.', emoji: '🌴', highlight: ['approve', 'reject.'], hold: 2200 });
       const approve = page.getByRole('button', { name: /^approve$/i }).first();
       if (await approve.count()) {
@@ -125,7 +127,7 @@ const SCENES = {
       const theme = page.getByRole('button', { name: /dark|theme/i }).first();
       if (await theme.count()) await click(page, theme, 1200);
       await say(page, { tag: 'Dark mode', text: 'And yes, there is a dark mode.', emoji: '🌙', hold: 2600 });
-    });
+    }, APPVIEW);
   },
 
   async 'slides-arch'(b) {
@@ -138,31 +140,43 @@ const SCENES = {
 
   async codebase(b) {
     await scene(b, 'codebase', async ({ page, mark }) => {
+      const open = async (name, pause = 1600) => {
+        const link = page.locator('table[aria-labelledby=folders-and-files] a, [aria-labelledby=folders-and-files] a').filter({ hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}$`) }).filter({ visible: true }).first();
+        await click(page, link, 300);
+        await page.waitForLoadState('load');
+        await sleep(pause);
+      };
+      const home = async () => {
+        await click(page, page.getByRole('link', { name: 'fellow-hrms', exact: true }).first(), 300);
+        await page.waitForLoadState('load');
+        await sleep(1200);
+      };
       await page.goto(REPO);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load');
+      await sleep(1500);
       await chip(page, '02 · CODEBASE');
       mark();
-      await say(page, { tag: 'Repo tour', text: 'backend, frontend, terraform, helm, argocd, monitoring. Everything as code.', emoji: '🗂️', highlight: ['code.'], hold: 3800 });
+      await say(page, { tag: 'Repo tour', text: 'backend, frontend, terraform, helm, argocd, monitoring. Everything as code.', emoji: '🗂️', highlight: ['code.'], hold: 3600 });
       await unsay(page);
-      await smoothScroll(page, 900, 2600);
-      await sleep(1500);
-      await page.goto(`${REPO}/tree/main/backend/app/routers`);
-      await page.waitForLoadState('networkidle');
-      await say(page, { tag: 'Backend', text: 'FastAPI routers: one file per resource, 26 endpoints in total.', emoji: '🐍', hold: 3400 });
-      await page.goto(`${REPO}/blob/main/backend/app/routers/leaves.py`);
-      await page.waitForLoadState('networkidle');
-      await smoothScroll(page, 700, 2200);
-      await sleep(1400);
-      await page.goto(`${REPO}/blob/main/.github/workflows/ci-cd.yml`);
-      await page.waitForLoadState('networkidle');
-      await say(page, { tag: 'Pipeline', text: 'The CI/CD workflow: test, build, scan, push, promote.', emoji: '⚙️', hold: 2400 });
-      await smoothScroll(page, 1400, 3200);
-      await sleep(1200);
+      await open('backend', 900);
+      await open('app', 900);
+      await open('routers', 900);
+      await say(page, { tag: 'Backend', text: 'FastAPI routers: one file per resource, 26 endpoints in total.', emoji: '🐍', hold: 2600 });
+      await open('leaves.py', 1200);
       await unsay(page);
-      await page.goto(`${REPO}/tree/main/helm/fellow/templates`);
-      await page.waitForLoadState('networkidle');
+      await smoothScroll(page, 600, 2200);
+      await sleep(1000);
+      await home();
+      await open('.github/workflows', 900);
+      await open('ci-cd.yml', 1200);
+      await say(page, { tag: 'Pipeline', text: 'The CI/CD workflow: test, build, scan, push, promote.', emoji: '⚙️', hold: 2200 });
+      await smoothScroll(page, 1100, 3000);
+      await unsay(page);
+      await home();
+      await open('helm/fellow', 900);
+      await open('templates', 1200);
       await say(page, { tag: 'Helm', text: 'The Helm chart: deployments, ingress, HPA, ServiceMonitor, Grafana dashboard.', emoji: '⛵', hold: 3800 });
-    });
+    }, READ);
   },
 
   async 'card-ci'(b) {
@@ -175,9 +189,9 @@ const SCENES = {
 
   async 'ci-push'(b) {
     await terminal(b, 'ci-push', async ({ page }) => {
-      await say(page, { tag: 'Live push', text: 'Committing the tool that recorded this video, then pushing to main.', emoji: '🚀', hold: 1500 });
+      await say(page, { tag: 'Live push', text: 'A real change to the tool recording this video, committed and pushed to main.', emoji: '🚀', hold: 1500 });
       await run(page, 'git status --short');
-      await run(page, 'git add tools/video && git commit -m "feat(tools): add scripted demo video recorder"');
+      await run(page, 'git add tools/video && git commit -m "fix(tools): record demo scenes at readable sizes"');
       await run(page, 'git pull --rebase --autostash -q origin main && git push origin main', { after: 2500 });
       await unsay(page);
     });
@@ -208,12 +222,12 @@ const SCENES = {
       await say(page, { tag: 'Trivy', text: 'Scan results are attached to every run.', emoji: '🛡️', hold: 3000 });
       await unsay(page);
       await page.goto(`${REPO}/commits/main`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load'); await sleep(1500);
       await say(page, { tag: 'GitOps', text: 'CI then commits the new image tag to Git for staging.', emoji: '🤖', highlight: ['Git'], hold: 3800 });
       await page.goto('https://github.com/Manasvi-247?tab=packages');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load'); await sleep(1500);
       await say(page, { tag: 'GHCR', text: 'Both images live in GitHub Container Registry, tagged with the commit SHA.', emoji: '📦', highlight: ['SHA.'], hold: 3800 });
-    });
+    }, READ);
   },
 
   async 'argocd'(b) {
@@ -226,7 +240,7 @@ const SCENES = {
       await page.keyboard.press('Enter');
       await page.waitForURL(/applications/);
       await page.goto('http://argocd.localhost/applications/argocd/fellow-staging?view=tree');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load'); await sleep(1500);
       await sleep(2500);
       await chip(page, '04 · GITOPS');
       mark();
@@ -237,7 +251,7 @@ const SCENES = {
       await smoothScroll(page, 500, 1500);
       await sticker(page, 'computer-cat', { x: 1600, y: 140, hold: 2200 });
       await say(page, { tag: 'Self-heal', text: 'Change something by hand and Argo CD puts it back. Git wins.', emoji: '🔁', highlight: ['Git', 'wins.'], hold: 3800 });
-    });
+    }, READ);
   },
 
   async 'card-tf'(b) {
@@ -316,14 +330,14 @@ const SCENES = {
       await unsay(page);
       await page.setExtraHTTPHeaders({ Authorization: auth });
       await page.goto('http://grafana.localhost/d/fellow-backend/fellow-backend-api?orgId=1&from=now-15m&to=now&kiosk&refresh=5s');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load'); await sleep(1500);
       await sleep(4000);
       await say(page, { tag: 'Grafana', text: 'Requests, errors, latency, CPU and the HPA scaling, live from the load test.', emoji: '📈', highlight: ['live'], hold: 4500 });
       await sticker(page, 'hacker-cat', { x: 1590, y: 690, hold: 2600 });
       await unsay(page);
       await smoothScroll(page, 500, 1800);
       await say(page, { tag: 'HPA', text: 'There it is: replicas climbing, then settling back down.', emoji: '📊', hold: 4500 });
-    });
+    }, READ);
   },
 
   async 'card-ts'(b) {
