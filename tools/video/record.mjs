@@ -1,7 +1,7 @@
 // Records every scene of the Fellow demo video as its own clip. Usage: node record.mjs [scene ...]
 import { execSync } from 'node:child_process';
 import {
-  launch, scene, say, unsay, sticker, chip, ring, click, moveTo, smoothScroll, run, sleep,
+  launch, scene, cue, say, unsay, sticker, chip, ring, click, moveTo, smoothScroll, run, sleep,
 } from './lib.mjs';
 
 const REPO = 'https://github.com/Manasvi-247/fellow-hrms';
@@ -70,7 +70,37 @@ const SCENES = {
   },
 
   async 'slides-open'(b) {
-    await slides(b, 'slides-open', [1, 2, 3, 4]);
+    await slides(b, 'slides-open', [2, 4]);
+  },
+
+  async readme(b) {
+    await scene(b, 'readme', async ({ page, mark }) => {
+      await page.goto(REPO);
+      await page.waitForLoadState('load');
+      await sleep(1500);
+      await page.locator('#readme, article.markdown-body').first().scrollIntoViewIfNeeded();
+      await page.mouse.move(1200, 500);
+      await sleep(1200);
+      await chip(page, 'OVERVIEW');
+      mark();
+      cue();
+      await sleep(3500);
+      const heading = (t) => page.locator('article.markdown-body h2').filter({ hasText: t }).first();
+      const show = async (t, hold) => {
+        await heading(t).evaluate((el) => el.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        await sleep(1200);
+        await ring(page, heading(t), 1200, 10);
+        await sleep(hold);
+      };
+      cue();
+      await show('Features', 6000);
+      cue();
+      await show('Architecture', 5000);
+      cue();
+      await sleep(5500);
+      cue();
+      await show('Tech stack', 6000);
+    }, READ);
   },
 
   async 'card-app'(b) {
@@ -84,14 +114,17 @@ const SCENES = {
       await page.waitForLoadState('load'); await sleep(1500);
       await chip(page, '01 · THE APP');
       mark();
+      cue();
       await say(page, { tag: 'Dashboard', text: 'Who is in, who is out, and what needs approving. Real data, straight from the API.', emoji: '👋', highlight: ['Real'], hold: 4200 });
       await ring(page, page.getByText('Pending requests').first(), 1600, 40);
       await unsay(page);
+      cue();
       await click(page, page.getByRole('button', { name: /collapse sidebar/i }), 900);
       await say(page, { tag: 'Bonus', text: 'Collapsible sidebar, because screen space is precious.', emoji: '🪄', hold: 2600 });
       await click(page, page.getByRole('button', { name: /expand sidebar/i }), 700);
       await unsay(page);
 
+      cue();
       await click(page, nav(page, 'Employees'), 1200);
       await say(page, { tag: 'Employees', text: 'Search, filter and real URLs like /employees/12.', emoji: '🔎', highlight: ['/employees/12.'], hold: 1500 });
       const search = page.getByRole('textbox', { name: 'Filter employees' });
@@ -100,30 +133,30 @@ const SCENES = {
       await sleep(1600);
       await click(page, page.getByText('Karan Shah').first(), 1800);
       await unsay(page);
+      cue();
       for (const tab of ['Leave', 'Attendance']) {
         await click(page, page.locator('main button, main [role=tab]').filter({ hasText: new RegExp(`^\\s*${tab}\\s*$`) }).first(), 1800);
       }
       await sticker(page, 'glasses-cat', { x: 1600, y: 120, hold: 1800, size: 220 });
 
+      cue();
       await click(page, nav(page, 'Leave').or(page.locator('aside[aria-label="Main navigation"]').getByRole('button', { name: /Leave/ })).first(), 1200);
-      const approvals = page.locator('main').getByRole('button', { name: /approvals/i }).first();
-      if (await approvals.count()) await click(page, approvals, 1200);
+      await click(page, page.locator('main button, main [role=tab], main a').filter({ hasText: /Approvals/ }).first(), 1500);
       await say(page, { tag: 'Leave', text: 'Managers approve or reject. Balances update, weekends and holidays never count.', emoji: '🌴', highlight: ['approve', 'reject.'], hold: 2200 });
-      const approve = page.getByRole('button', { name: /^approve$/i }).first();
-      if (await approve.count()) {
-        await click(page, approve, 1200);
-        const confirm = page.getByRole('dialog').getByRole('button', { name: /approve/i });
-        if (await confirm.count()) await click(page, confirm.first(), 1500);
-      }
+      await click(page, page.locator('main button').filter({ hasText: /^\s*Approve\s*$/ }).first(), 1200);
+      const confirm = page.getByRole('dialog').getByRole('button', { name: /approve/i });
+      if (await confirm.count()) await click(page, confirm.first(), 1500);
       await sleep(1200);
       await unsay(page);
 
+      cue();
       await click(page, nav(page, 'Attendance'), 1500);
-      await say(page, { tag: 'Attendance', text: 'It is the middle of the night, so nobody is in yet. Let us be the first.', emoji: '🦉', highlight: ['first.'], hold: 2600 });
-      const checkIn = page.getByRole('button', { name: /check in/i }).first();
-      if (await checkIn.count()) await click(page, checkIn, 2200);
+      await say(page, { tag: 'Attendance', text: 'Night shift! Checking in and out works at any hour.', emoji: '🦉', highlight: ['any'], hold: 2600 });
+      const punch = page.getByRole('button', { name: /check (in|out)/i }).first();
+      if (await punch.count()) await click(page, punch, 2200);
       await say(page, { tag: 'Server time', text: 'The time comes from the server, so nobody can fake it. Late after 09:30.', emoji: '⏰', highlight: ['server,'], hold: 3600 });
       await unsay(page);
+      cue();
       const theme = page.getByRole('button', { name: /dark|theme/i }).first();
       if (await theme.count()) await click(page, theme, 1200);
       await say(page, { tag: 'Dark mode', text: 'And yes, there is a dark mode.', emoji: '🌙', hold: 2600 });
@@ -156,27 +189,93 @@ const SCENES = {
       await sleep(1500);
       await chip(page, '02 · CODEBASE');
       mark();
+      cue();
       await say(page, { tag: 'Repo tour', text: 'backend, frontend, terraform, helm, argocd, monitoring. Everything as code.', emoji: '🗂️', highlight: ['code.'], hold: 3600 });
       await unsay(page);
+      cue();
       await open('backend', 900);
       await open('app', 900);
       await open('routers', 900);
       await say(page, { tag: 'Backend', text: 'FastAPI routers: one file per resource, 26 endpoints in total.', emoji: '🐍', hold: 2600 });
+      cue();
       await open('leaves.py', 1200);
       await unsay(page);
       await smoothScroll(page, 600, 2200);
       await sleep(1000);
       await home();
+      cue();
       await open('.github/workflows', 900);
       await open('ci-cd.yml', 1200);
       await say(page, { tag: 'Pipeline', text: 'The CI/CD workflow: test, build, scan, push, promote.', emoji: '⚙️', hold: 2200 });
       await smoothScroll(page, 1100, 3000);
       await unsay(page);
       await home();
+      cue();
       await open('helm/fellow', 900);
       await open('templates', 1200);
       await say(page, { tag: 'Helm', text: 'The Helm chart: deployments, ingress, HPA, ServiceMonitor, Grafana dashboard.', emoji: '⛵', hold: 3800 });
     }, READ);
+  },
+
+  async 'api-docs'(b) {
+    await scene(b, 'api-docs', async ({ page, mark }) => {
+      const op = (summary) => page.locator('.opblock').filter({ has: page.locator('.opblock-summary-description', { hasText: new RegExp(`^${summary}$`) }) }).first();
+      await page.goto('http://localhost:8001/docs');
+      await page.waitForSelector('.opblock');
+      await sleep(1500);
+      await chip(page, 'API DOCS');
+      mark();
+      cue();
+      await sleep(4500);
+      cue();
+      await smoothScroll(page, 600, 2500);
+      await sleep(2500);
+
+      cue();
+      const get = op('Get Employee');
+      await click(page, get.locator('.opblock-summary'), 1200);
+      await click(page, get.getByRole('button', { name: 'Try it out' }), 800);
+      await click(page, get.locator('input[placeholder=employee_id]'), 200);
+      await page.keyboard.type('12', { delay: 120 });
+      await ring(page, get.getByRole('button', { name: 'Execute' }), 900);
+      await click(page, get.getByRole('button', { name: 'Execute' }), 1500);
+      const live = get.locator('.live-responses-table').first();
+      await live.evaluate((el) => el.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+      await sleep(1500);
+      await ring(page, live.locator('.response-col_status').first(), 1500);
+      cue();
+      await sleep(4500);
+      await click(page, get.locator('.opblock-summary'), 800);
+
+      cue();
+      const put = op('Update Employee');
+      await put.evaluate((el) => el.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      await sleep(1000);
+      await click(page, put.locator('.opblock-summary'), 1200);
+      await click(page, put.getByRole('button', { name: 'Try it out' }), 800);
+      await click(page, put.locator('input[placeholder=employee_id]'), 200);
+      await page.keyboard.type('12', { delay: 120 });
+      const body = put.locator('textarea.body-param__text');
+      await click(page, body, 200);
+      await page.keyboard.press('Meta+A');
+      await page.keyboard.type('{ "email": null }', { delay: 70 });
+      await sleep(800);
+      await click(page, put.getByRole('button', { name: 'Execute' }), 1500);
+      const live2 = put.locator('.live-responses-table').first();
+      await live2.evaluate((el) => el.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+      await sleep(1500);
+      cue();
+      await ring(page, live2.locator('.response-col_status').first(), 1500);
+      await sleep(4500);
+      await click(page, put.locator('.opblock-summary'), 800);
+
+      cue();
+      await page.locator('section.models').first().evaluate((el) => el.scrollIntoView({ block: 'start' }));
+      await sleep(800);
+      const firstModel = page.locator('section.models .model-container').first();
+      if (await firstModel.count()) await click(page, firstModel.locator('.model-box-control, button').first(), 1500);
+      await sleep(4500);
+    }, APPVIEW);
   },
 
   async 'card-ci'(b) {
@@ -244,12 +343,14 @@ const SCENES = {
       await sleep(2500);
       await chip(page, '04 · GITOPS');
       mark();
+      cue();
       await say(page, { tag: 'Argo CD', text: 'Argo CD watches Git and syncs staging to the new commit. Synced and Healthy.', emoji: '🐙', highlight: ['Synced', 'Healthy.'], hold: 4500 });
       const refresh = page.getByRole('button', { name: /refresh/i }).first();
       if (await refresh.count()) await click(page, refresh, 2500);
       await unsay(page);
       await smoothScroll(page, 500, 1500);
       await sticker(page, 'computer-cat', { x: 1600, y: 140, hold: 2200 });
+      cue();
       await say(page, { tag: 'Self-heal', text: 'Change something by hand and Argo CD puts it back. Git wins.', emoji: '🔁', highlight: ['Git', 'wins.'], hold: 3800 });
     }, READ);
   },
@@ -264,16 +365,20 @@ const SCENES = {
 
   async terraform(b) {
     await terminal(b, 'terraform', async ({ page, fast }) => {
+      cue();
       await say(page, { tag: 'Terraform', text: 'Plan first. Reading the plan is a whole personality.', emoji: '🧐', hold: 1200 });
       await run(page, 'cd terraform && terraform plan -no-color | tail -n 12', { timeout: 180000, after: 3500 });
       await unsay(page);
       await page.keyboard.press('Control+L');
+      cue();
       await run(page, 'terraform output', { after: 3000 });
       await page.keyboard.press('Control+L');
+      cue();
       await say(page, { tag: 'LocalStack', text: 'The VPC and subnets really exist, inside LocalStack. No AWS bill.', emoji: '☁️', hold: 1200 });
       await run(page, "awsl ec2 describe-subnets --filters Name=tag:Project,Values=fellow --query 'Subnets[].[Tags[?Key==`Name`]|[0].Value,CidrBlock,AvailabilityZone]' --output table", { after: 4000 });
       await unsay(page);
       await page.keyboard.press('Control+L');
+      cue();
       await say(page, { tag: 'EKS', text: 'Flip one variable and the same code plans a real EKS cluster.', emoji: '🔀', hold: 1000 });
       await run(page, 'terraform plan -no-color -var create_eks=true | grep -E "eks|Plan:"', { timeout: 180000, after: 4000 });
       await run(page, 'cd ..', { after: 300 });
@@ -290,20 +395,25 @@ const SCENES = {
 
   async kubernetes(b) {
     await terminal(b, 'kubernetes', async ({ page, fast }) => {
+      cue();
       await say(page, { tag: 'Cluster', text: 'Three nodes, created by Terraform.', emoji: '🖥️', hold: 800 });
       await run(page, 'kubectl get nodes', { after: 2500 });
       await page.keyboard.press('Control+L');
+      cue();
       await say(page, { tag: 'Workloads', text: 'Pods, ClusterIP services, the ingress and the HPA.', emoji: '🐳', hold: 800 });
       await run(page, 'kubectl get pods,svc,ingress,hpa -n fellow', { after: 4500 });
       await page.keyboard.press('Control+L');
+      cue();
       await say(page, { tag: 'Helm', text: 'Every release, managed by Helm.', emoji: '⛵', hold: 800 });
       await run(page, 'helm list -A', { after: 3500 });
       await page.keyboard.press('Control+L');
+      cue();
       await say(page, { tag: 'Load test', text: 'Now let us stress it and watch the HPA go from 2 pods to 6.', emoji: '🔥', highlight: ['2', '6.'], hold: 800 });
       await fast(6, async () => {
         await run(page, 'WORKERS=6 DURATION=120 ./scripts/load-test.sh 2>/dev/null | cut -c1-90', { timeout: 300000, after: 1500 });
       });
       await unsay(page);
+      cue();
       await run(page, 'kubectl get hpa,deploy fellow-backend -n fellow', { after: 4000 });
       await sticker(page, 'lock-in', { x: 1480, y: 70, hold: 2600, size: 360, rot: -4 });
     });
@@ -317,6 +427,35 @@ const SCENES = {
     await slides(b, 'slides-obs', [9], 6000);
   },
 
+  async metrics(b) {
+    await scene(b, 'metrics', async ({ page, mark }) => {
+      await page.goto('http://localhost:8001/metrics');
+      await page.waitForLoadState('load');
+      await page.addStyleTag({ content: 'body{font-size:20px;line-height:1.5;padding:24px 32px;background:#fff}' });
+      await sleep(800);
+      await chip(page, 'METRICS');
+      mark();
+      cue();
+      await sleep(4000);
+      cue();
+      await page.evaluate(() => {
+        const pre = document.querySelector('pre') || document.body;
+        const i = pre.textContent.indexOf('http_requests_total{');
+        if (i < 0) return;
+        const range = document.createRange();
+        const node = pre.firstChild;
+        range.setStart(node, i);
+        range.setEnd(node, i + 1);
+        const mark = document.createElement('span');
+        mark.id = 'fx-target';
+        range.insertNode(mark);
+        mark.scrollIntoView({ block: 'start' });
+        window.scrollBy(0, -120);
+      });
+      await sleep(7000);
+    }, READ);
+  },
+
   async observability(b) {
     const pw = sh("kubectl get secret grafana-admin -n monitoring -o jsonpath='{.data.admin-password}' | base64 -d");
     const auth = 'Basic ' + Buffer.from(`admin:${pw}`).toString('base64');
@@ -326,15 +465,19 @@ const SCENES = {
       await sleep(2500);
       await chip(page, '07 · OBSERVABILITY');
       mark();
+      cue();
       await say(page, { tag: 'Prometheus', text: 'Prometheus scrapes /metrics on every backend pod. All targets UP.', emoji: '📡', highlight: ['UP.'], hold: 4200 });
       await unsay(page);
+      cue();
       await page.setExtraHTTPHeaders({ Authorization: auth });
       await page.goto('http://grafana.localhost/d/fellow-backend/fellow-backend-api?orgId=1&from=now-15m&to=now&kiosk&refresh=5s');
       await page.waitForLoadState('load'); await sleep(1500);
       await sleep(4000);
+      cue();
       await say(page, { tag: 'Grafana', text: 'Requests, errors, latency, CPU and the HPA scaling, live from the load test.', emoji: '📈', highlight: ['live'], hold: 4500 });
       await sticker(page, 'hacker-cat', { x: 1590, y: 690, hold: 2600 });
       await unsay(page);
+      cue();
       await smoothScroll(page, 500, 1800);
       await say(page, { tag: 'HPA', text: 'There it is: replicas climbing, then settling back down.', emoji: '📊', hold: 4500 });
     }, READ);
@@ -350,15 +493,21 @@ const SCENES = {
 
   async troubleshooting(b) {
     await terminal(b, 'troubleshooting', async ({ page }) => {
+      cue();
       await say(page, { tag: 'Lab 1', text: 'Deploy an image tag that does not exist.', emoji: '🙃', hold: 800 });
       await run(page, 'kubectl apply -f troubleshooting/broken-image.yaml && sleep 12 && kubectl get pods -n fellow -l app=fellow-broken-image', { after: 2500 });
+      cue();
       await say(page, { tag: 'Diagnose', text: 'ImagePullBackOff. The events tell us why.', emoji: '🔍', highlight: ['ImagePullBackOff.'], hold: 800 });
+      cue();
       await run(page, 'kubectl get events -n fellow --field-selector reason=Failed --sort-by=.lastTimestamp | tail -n 3 | cut -c1-150', { after: 4500 });
       await page.keyboard.press('Control+L');
+      cue();
       await say(page, { tag: 'Lab 2', text: 'A Service whose selector matches nothing.', emoji: '🦆', hold: 800 });
       await run(page, 'kubectl apply -f troubleshooting/broken-service.yaml && kubectl get endpointslices -n fellow -l kubernetes.io/service-name=fellow-broken-service', { after: 3500 });
+      cue();
       await say(page, { tag: 'Fix', text: 'Point the selector at the right label and the endpoints appear.', emoji: '🔧', hold: 800 });
       await run(page, 'kubectl patch service fellow-broken-service -n fellow -p \'{"spec":{"selector":{"app.kubernetes.io/name":"backend"}}}\' && sleep 2 && kubectl get endpointslices -n fellow -l kubernetes.io/service-name=fellow-broken-service', { after: 4000 });
+      cue();
       await run(page, 'kubectl delete -f troubleshooting/ --wait=false', { after: 2000 });
       await unsay(page);
     });
@@ -366,6 +515,14 @@ const SCENES = {
 
   async 'slides-end'(b) {
     await slides(b, 'slides-end', [11, 12], 6000);
+  },
+
+  async 'teaser-hook'(b) {
+    await card(b, 'teaser-hook', { title: 'Fellow', sub: 'An HR app, shipped like production.', pill: 'React · FastAPI · Kubernetes', img: 'lock-in', color: '#C69FD5' }, 3200);
+  },
+
+  async 'teaser-outro'(b) {
+    await card(b, 'teaser-outro', { title: 'Fellow', sub: 'Tested. Scanned. GitOps-deployed. Autoscaled. Monitored.', pill: 'github.com/Manasvi-247/fellow-hrms', img: 'thumbs-cat', color: '#FFBDC5' }, 3400);
   },
 
   async outro(b) {

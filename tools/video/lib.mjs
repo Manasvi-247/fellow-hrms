@@ -74,6 +74,11 @@ export async function launch() {
   return chromium.launch({ channel: 'chrome', headless: true, args: ['--force-color-profile=srgb', '--hide-scrollbars'] });
 }
 
+let CURRENT = null;
+export function cue() {
+  CURRENT.marks.cues.push((Date.now() - CURRENT.t0) / 1000);
+}
+
 export async function scene(browser, name, fn, opts = {}) {
   const context = await browser.newContext({
     viewport: opts.viewport || { width: W, height: H },
@@ -86,7 +91,8 @@ export async function scene(browser, name, fn, opts = {}) {
   if (opts.init) await context.addInitScript(opts.init);
   const page = await context.newPage();
   const t0 = Date.now();
-  const marks = { start: 0, speed: [], cut: [] };
+  const marks = { start: 0, speed: [], cut: [], cues: [] };
+  CURRENT = { marks, t0 };
   const api = {
     page,
     mark() { marks.start = (Date.now() - t0) / 1000; },

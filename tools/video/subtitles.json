@@ -1,0 +1,133 @@
+{
+  "intro": [
+    "Fellow: an employee management app, and the DevOps pipeline that ships it."
+  ],
+  "slides-open": [
+    "Fellow covers people, departments, leave, attendance and holidays for a small company.",
+    "The stack: React and FastAPI, tested, containerised, deployed to Kubernetes and monitored."
+  ],
+  "readme": [
+    "The README documents the whole project: features, architecture, setup and operations.",
+    "Features: each area of the app and the business rules it enforces.",
+    "Architecture: the ingress sends / to the React frontend and /api to the FastAPI backend.",
+    "Delivery: tests, image build, Trivy scan, push to GHCR, then Argo CD deploys from Git.",
+    "The tech stack, layer by layer."
+  ],
+  "card-app": [
+    "Part 1: the application."
+  ],
+  "app-tour": [
+    "The dashboard shows live numbers from the FastAPI backend, which queries PostgreSQL.",
+    "The sidebar collapses to an icon rail, and the choice is remembered in the browser.",
+    "Employees can be searched and filtered, and every page has its own URL.",
+    "A profile shows personal and job details, leave balances and monthly attendance.",
+    "Approving a leave request updates the request and the employee's balance through the API.",
+    "Checking in and out uses the server's clock, so the time cannot be changed from the browser.",
+    "Light and dark themes are both supported."
+  ],
+  "slides-arch": [
+    "Architecture: browser, ingress, frontend and backend pods, PostgreSQL, Prometheus, Grafana and Argo CD."
+  ],
+  "card-code": [
+    "Part 2: the codebase."
+  ],
+  "codebase": [
+    "One repository holds the app, the pipeline, the infrastructure and the docs.",
+    "The backend is split into FastAPI routers, one file per resource.",
+    "Routers validate input with Pydantic schemas and use SQLAlchemy to talk to PostgreSQL.",
+    "The CI/CD workflow lives in .github/workflows/ci-cd.yml.",
+    "The Helm chart templates describe every Kubernetes object the app needs."
+  ],
+  "api-docs": [
+    "FastAPI generates this interactive OpenAPI documentation automatically, at /docs.",
+    "Every endpoint is listed with its method, path, parameters and response schema.",
+    "Try it out: GET /api/employees/12 returns that employee as JSON, with status 200.",
+    "The response: status 200 with the employee as JSON, plus the matching curl command.",
+    "Next, an invalid update: PUT with the email set to null.",
+    "The API rejects it with status 422 and a clear message: email cannot be null.",
+    "The Schemas section lists every request and response model, defined with Pydantic."
+  ],
+  "card-ci": [
+    "Part 3: CI/CD."
+  ],
+  "slides-ci": [
+    "Every push to main runs the pipeline: test, build, scan, publish, promote and sync."
+  ],
+  "ci-push": [
+    "A real change is committed and pushed to main from the terminal.",
+    "The push triggers the GitHub Actions workflow."
+  ],
+  "ci-run": [
+    "pytest and the frontend build run first; a failing test stops the pipeline (sped up 8x).",
+    "Both Docker images are built and scanned by Trivy, which fails the build on HIGH or CRITICAL CVEs.",
+    "Images are pushed to GitHub Container Registry, tagged with the commit SHA.",
+    "The last job commits the new image tag to Git for the staging environment.",
+    "Both images are listed in GitHub Container Registry."
+  ],
+  "argocd": [
+    "Argo CD watches the Git repository and deploys that commit to the staging namespace.",
+    "Synced means the cluster matches Git; Healthy means every resource is running."
+  ],
+  "card-tf": [
+    "Part 4: infrastructure as code with Terraform."
+  ],
+  "slides-tf": [
+    "Terraform defines the VPC, subnets, NAT gateway, an optional EKS cluster and the kind cluster."
+  ],
+  "terraform": [
+    "terraform plan compares the code with what exists and shows what would change.",
+    "The outputs list the IDs of the VPC, subnets and NAT gateway created in LocalStack.",
+    "The subnets exist in the emulated AWS API: two public and two private, across two zones.",
+    "Setting create_eks=true plans the EKS cluster, IAM roles and node group from the same code."
+  ],
+  "card-k8s": [
+    "Part 5: Kubernetes and Helm."
+  ],
+  "slides-k8s": [
+    "One Helm chart deploys both environments: dev with Helm, staging with Argo CD."
+  ],
+  "kubernetes": [
+    "The cluster has three nodes: one control plane and two workers.",
+    "Backend and frontend run two replicas each behind ClusterIP services; the ingress routes traffic.",
+    "helm list shows the releases for the app and for monitoring.",
+    "A load generator sends traffic to the backend while the HPA watches CPU (sped up 6x).",
+    "CPU goes above the 60% target, so the HPA scales the backend from 2 to 6 pods."
+  ],
+  "card-obs": [
+    "Part 6: observability."
+  ],
+  "slides-obs": [
+    "Prometheus collects the metrics and Grafana turns them into a dashboard."
+  ],
+  "metrics": [
+    "The backend exposes Prometheus metrics at /metrics: request counts by endpoint, method and status.",
+    "The PUT 4xx counter is the invalid request sent from the API docs a moment ago."
+  ],
+  "observability": [
+    "Prometheus scrapes every backend pod every 15 seconds, and all targets are UP.",
+    "This Grafana dashboard ships inside the Helm chart.",
+    "During the load test, request rate, latency and CPU per pod all rise.",
+    "The autoscaling panel shows the replicas going up to 6."
+  ],
+  "card-ts": [
+    "Part 7: troubleshooting."
+  ],
+  "slides-ts": [
+    "Real problems found and fixed while building the project."
+  ],
+  "troubleshooting": [
+    "Lab 1: a deployment points at an image tag that does not exist.",
+    "The pod cannot start: ErrImagePull, then ImagePullBackOff.",
+    "The events explain why: the image was not found in the registry.",
+    "Lab 2: a Service whose selector matches no pods has no endpoints.",
+    "Patching the selector to the real pod label brings the endpoints back.",
+    "Both labs are deleted afterwards."
+  ],
+  "slides-end": [
+    "Key learnings: gate early, let Git drive deployments, and measure before scaling.",
+    "Code, docs, slides and this video are all in the GitHub repository."
+  ],
+  "outro": [
+    "Thank you for watching."
+  ]
+}
