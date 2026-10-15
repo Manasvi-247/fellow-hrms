@@ -1,0 +1,16 @@
+$ curl -s http://localhost:8000/metrics | grep -E '^http_requests_total' | head -15
+http_requests_total{handler="/api/dashboard/stats",method="GET",status="2xx"} 6.0
+http_requests_total{handler="/",method="GET",status="2xx"} 1.0
+http_requests_total{handler="/api/departments",method="GET",status="2xx"} 7.0
+http_requests_total{handler="/api/leave-types",method="GET",status="2xx"} 7.0
+http_requests_total{handler="/api/holidays",method="GET",status="2xx"} 16.0
+http_requests_total{handler="/api/employees",method="GET",status="2xx"} 10.0
+http_requests_total{handler="/api/leaves",method="GET",status="2xx"} 8.0
+http_requests_total{handler="/api/attendance",method="GET",status="2xx"} 9.0
+http_requests_total{handler="/api/employees",method="POST",status="2xx"} 1.0
+http_requests_total{handler="/api/employees/{employee_id}",method="GET",status="2xx"} 3.0
+http_requests_total{handler="/api/employees/{employee_id}",method="PUT",status="2xx"} 2.0
+http_requests_total{handler="/api/employees/{employee_id}/leave-balance",method="GET",status="2xx"} 1.0
+http_requests_total{handler="/docs",method="GET",status="2xx"} 1.0
+http_requests_total{handler="/api/employees/{employee_id}",method="DELETE",status="2xx"} 1.0
+http_requests_total{handler="/api/employees/{employee_id}",method="GET",status="4xx"} 1.0

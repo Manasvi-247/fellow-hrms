@@ -1,0 +1,9 @@
+$ kubectl get pods -n monitoring
+NAME                                             READY   STATUS    RESTARTS   AGE
+monitoring-grafana-d597ccbc4-7qzh5               3/3     Running   0          6m10s
+monitoring-kube-state-metrics-78fd56fc4b-7kcxz   1/1     Running   0          6m10s
+monitoring-operator-6c997bb4c4-wnglz             1/1     Running   0          6m10s
+monitoring-prometheus-node-exporter-jxbhh        1/1     Running   0          6m10s
+monitoring-prometheus-node-exporter-tcf5w        1/1     Running   0          6m10s
+monitoring-prometheus-node-exporter-v5ms9        1/1     Running   0          6m10s
+prometheus-monitoring-prometheus-0               2/2     Running   0          5m8s
