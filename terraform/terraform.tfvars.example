@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars and adjust. terraform.tfvars is gitignored; never put credentials here.
+aws_region          = "ap-south-1"
+environment         = "dev"
+cluster_name        = "fellow"
+use_localstack      = true
+localstack_endpoint = "http://localhost:4566"
+availability_zones  = ["ap-south-1a", "ap-south-1b"]
+
+# Real AWS only (costs money: EKS control plane, NAT gateway, EC2 nodes):
+# use_localstack      = false
+# create_eks          = true
+# create_kind_cluster = false

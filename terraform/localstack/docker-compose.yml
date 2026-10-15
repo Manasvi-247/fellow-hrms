@@ -1,0 +1,11 @@
+# Local AWS emulator for the VPC resources.
+# 4.14 is the last community image that runs without an account. To use a newer image,
+# create a free LocalStack account and run: LOCALSTACK_IMAGE=localstack/localstack:2026.10 LOCALSTACK_AUTH_TOKEN=... docker compose up -d
+services:
+  localstack:
+    image: ${LOCALSTACK_IMAGE:-localstack/localstack:4.14}
+    ports:
+      - "127.0.0.1:4566:4566"
+    environment:
+      SERVICES: ec2,iam,sts
+      LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
