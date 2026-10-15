@@ -14,7 +14,7 @@ services:
     runtime: docker
     plan: free
     region: singapore
-    rootDir: backend
+    # Docker paths are relative to the repo root because no rootDir is set for this service.
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /health
