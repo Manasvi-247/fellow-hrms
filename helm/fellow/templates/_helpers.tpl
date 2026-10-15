@@ -35,3 +35,7 @@ allowPrivilegeEscalation: false
 capabilities:
   drop: ["ALL"]
 {{- end -}}
+
+{{- define "fellow.dbSecret" -}}
+{{- .Values.postgres.existingSecret | default (printf "%s-db" (include "fellow.fullname" .)) -}}
+{{- end -}}

@@ -30,6 +30,9 @@ postgres:
   username: fellow
   # Override at install time, for example --set postgres.password=$(openssl rand -hex 16)
   password: change-me
+  # Name of an existing Secret with POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD and DATABASE_URL.
+  # When set, the chart does not create its own Secret (use this for GitOps so no password lives in Git).
+  existingSecret: ""
   storage: 1Gi
   resources:
     requests: {cpu: 100m, memory: 256Mi}

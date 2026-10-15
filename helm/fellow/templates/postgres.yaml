@@ -34,8 +34,10 @@ spec:
       labels:
         {{- include "fellow.labels" . | nindent 8 }}
         {{- include "fellow.selectorLabels" $ctx | nindent 8 }}
+      {{- if not .Values.postgres.existingSecret }}
       annotations:
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+      {{- end }}
     spec:
       securityContext:
         runAsUser: 70
@@ -50,7 +52,7 @@ spec:
               containerPort: 5432
           envFrom:
             - secretRef:
-                name: {{ include "fellow.fullname" . }}-db
+                name: {{ include "fellow.dbSecret" . }}
           env:
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
