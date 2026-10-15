@@ -21,7 +21,7 @@ const COUNT_PROMPTS = () => {
       last = document.title;
     }).observe(document.querySelector('title') || document.head, { childList: true, subtree: true, characterData: true });
     const style = document.createElement('style');
-    style.textContent = 'html,body{background:#14121A!important}#terminal-container{position:absolute!important;inset:48px 64px 300px 64px!important;width:auto!important;height:auto!important}';
+    style.textContent = 'html,body{background:#14121A!important}#terminal-container{position:absolute!important;inset:48px 64px 300px 64px!important;width:auto!important;height:auto!important}.fx-cursor{display:none!important}';
     document.head.appendChild(style);
     setTimeout(() => dispatchEvent(new Event('resize')), 200);
   };
