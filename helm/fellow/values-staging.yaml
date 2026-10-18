@@ -1,6 +1,6 @@
 # Staging environment, deployed by Argo CD from Git (see argocd/fellow-staging.yaml).
 # CI rewrites imageTag to the commit SHA after the images pass Trivy and are pushed to GHCR.
-imageTag: 4e84b6b36c19578f40ec60e3d6990d25e03e5b86
+imageTag: db5f116f6bc153ca2fa8accec75a5ca6ff031003
 image:
   registry: ghcr.io/manasvi-247
   pullPolicy: IfNotPresent
