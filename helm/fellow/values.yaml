@@ -34,6 +34,8 @@ postgres:
   # When set, the chart does not create its own Secret (use this for GitOps so no password lives in Git).
   existingSecret: ""
   storage: 1Gi
+  # Leave empty to use the cluster default; set it on clusters without a default (gp2 on EKS).
+  storageClass: ""
   resources:
     requests: {cpu: 100m, memory: 256Mi}
     limits: {cpu: 500m, memory: 512Mi}
@@ -41,6 +43,7 @@ postgres:
 ingress:
   enabled: true
   className: nginx
+  # Leave empty to answer on any hostname (for example a cloud load balancer address).
   host: fellow.localhost
   tls: []
 

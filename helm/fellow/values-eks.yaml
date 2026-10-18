@@ -1,0 +1,5 @@
+# Layered on top of values-staging.yaml by Argo CD on EKS (see argocd/fellow-eks.yaml).
+postgres:
+  storageClass: gp2
+ingress:
+  host: ""
