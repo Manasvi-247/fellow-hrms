@@ -1,0 +1,29 @@
+# GitOps on AWS EKS: Argo CD inside the cluster pulls helm/fellow from GitHub, so CI needs no AWS credentials.
+# CI updates the image tag in values-staging.yaml; values-eks.yaml adds the EKS storage class and an any-host ingress.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fellow-eks
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Manasvi-247/fellow-hrms.git
+    targetRevision: main
+    path: helm/fellow
+    helm:
+      releaseName: fellow-staging
+      valueFiles:
+        - values-staging.yaml
+        - values-eks.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: fellow-staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
