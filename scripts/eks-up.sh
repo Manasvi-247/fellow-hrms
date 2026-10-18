@@ -9,6 +9,7 @@ CLUSTER="${EKS_CLUSTER:-fellow}"
 CONTEXT=fellow-eks
 INGRESS_NGINX_VERSION="controller-v1.15.1"
 ARGOCD_VERSION="v3.5.5"
+METRICS_SERVER_VERSION="v0.9.0"
 NS=fellow-staging
 k() { kubectl --context "$CONTEXT" "$@"; }
 
@@ -17,6 +18,9 @@ k get nodes -o wide
 
 k apply -f "https://raw.githubusercontent.com/kubernetes/ingress-nginx/${INGRESS_NGINX_VERSION}/deploy/static/provider/aws/deploy.yaml"
 k rollout status -n ingress-nginx deployment/ingress-nginx-controller --timeout=300s
+
+# EKS does not ship metrics-server; the HPA needs it for CPU metrics.
+k apply -f "https://github.com/kubernetes-sigs/metrics-server/releases/download/${METRICS_SERVER_VERSION}/components.yaml"
 
 k create namespace argocd --dry-run=client -o yaml | k apply -f -
 k apply -n argocd --server-side --force-conflicts \
