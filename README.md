@@ -396,6 +396,8 @@ EKS deployments rolled to `hrms-*:ba69d69...` with 2/2 pods ready, served at the
 | ![Workloads](docs/screenshots/rubric/m8-eks-workloads.png) **Pods, services, ingress, HPA, PVC, Argo CD Synced** | ![Load balancer](docs/screenshots/rubric/m8-eks-lb.png) **AWS Network Load Balancer** |
 | ![App on EKS](docs/screenshots/rubric/m8-eks-app.png) **Fellow served from EKS** | ![Actions run](docs/screenshots/rubric/m5-actions-eks.png) **The CI run that deployed it** |
 
+<p align="center"><img src="docs/screenshots/rubric/m7-aws-destroy.png" alt="terraform destroy" width="700"><br><b><code>terraform destroy</code>: 26 destroyed, nothing left running</b></p>
+
 ## Observability
 
 - The backend exposes Prometheus metrics at `/metrics` (request counts by handler, method and status class, latency histograms, sizes).
