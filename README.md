@@ -4,7 +4,7 @@
 
 <h1 align="center">Fellow</h1>
 <p align="center"><b>An employee management app, shipped the DevOps way.</b><br>
-React · FastAPI · PostgreSQL · Docker · GitHub Actions · Trivy · GHCR · Terraform · LocalStack · Kubernetes (kind) · Helm · Argo CD · Prometheus · Grafana</p>
+React · FastAPI · PostgreSQL · Docker · GitHub Actions · Trivy · GHCR · Terraform · AWS (VPC, EKS) · LocalStack · Kubernetes (kind, EKS) · Helm · Argo CD · Prometheus · Grafana</p>
 
 <p align="center"><b>Live:</b> <a href="https://fellow-hrms.onrender.com">fellow-hrms.onrender.com</a> · API docs: <a href="https://fellow-hrms-api.onrender.com/docs">fellow-hrms-api.onrender.com/docs</a><br><sub>Free tier: the API sleeps when idle, so the first request can take about a minute.</sub></p>
 
@@ -42,11 +42,12 @@ Slides: [`presentation.pptx`](presentation.pptx) (PDF copy: [`demo/slides.pdf`](
 8. [Infrastructure with Terraform](#infrastructure-with-terraform)
 9. [Kubernetes and Helm](#kubernetes-and-helm)
 10. [GitOps with Argo CD](#gitops-with-argo-cd)
-11. [Observability](#observability)
-12. [Troubleshooting labs](#troubleshooting-labs)
-13. [Live deployment on Render](#live-deployment-on-render)
-14. [Screenshots](#screenshots)
-15. [Known issues and limitations](#known-issues-and-limitations)
+11. [Real AWS deployment: VPC and EKS](#real-aws-deployment-vpc-and-eks)
+12. [Observability](#observability)
+13. [Troubleshooting labs](#troubleshooting-labs)
+14. [Live deployment on Render](#live-deployment-on-render)
+15. [Screenshots](#screenshots)
+16. [Known issues and limitations](#known-issues-and-limitations)
 
 ---
 
@@ -104,6 +105,10 @@ flowchart LR
 pushed to GHCR tagged with the commit SHA. A bot commit writes that SHA into `helm/fellow/values-staging.yaml`, and Argo CD rolls the
 staging environment to it. Git is the single source of truth for what runs in staging.
 
+The diagram shows the local setup. The same Terraform, Helm chart and Argo CD flow also ran on a real Amazon EKS cluster, where
+the cluster sits in private subnets of a real VPC and an AWS Network Load Balancer replaces localhost; see
+[Real AWS deployment](#real-aws-deployment-vpc-and-eks).
+
 ## Tech stack
 
 | Layer | Tools |
@@ -115,7 +120,7 @@ staging environment to it. Git is the single source of truth for what runs in st
 | Containers | Docker multi-stage builds, non-root users, Docker Compose |
 | CI/CD | GitHub Actions, GitHub Container Registry (GHCR) |
 | Security | Trivy image scanning, actionlint, pinned dependencies, non-root pods, no secrets in Git |
-| Infrastructure | Terraform, LocalStack (AWS emulator), AWS VPC and EKS code, kind |
+| Infrastructure | Terraform, real AWS (VPC, NAT, EKS 1.35, EBS CSI) in `ap-southeast-2`, LocalStack (AWS emulator), kind |
 | Orchestration | Kubernetes, Helm, ingress-nginx, Horizontal Pod Autoscaler, metrics-server |
 | GitOps | Argo CD |
 | Observability | Prometheus, Grafana, kube-state-metrics (kube-prometheus-stack) |
@@ -239,6 +244,11 @@ push to main
 ranges inefficiently and burn CPU. The nginx 1.27 Alpine base also had HIGH issues in openssl, libxml2, musl and zlib. Upgrading FastAPI
 and Starlette, moving to nginx 1.30 and running `apk upgrade` in the image brought both scans to 0 HIGH and 0 CRITICAL.
 
+**A second catch, and a cache bug.** Later, the frontend scan failed on CVE-2026-77214 in libexpat 2.8.5 even though the image runs
+`apk upgrade`. The GitHub Actions build cache was replaying an old `apk upgrade` layer, so the fixed package (2.9.0) was never
+installed. The workflow now passes a per-run build argument (`APK_REFRESH=<run id>`) that forces that one layer to rebuild every
+time, so security fixes in the base image are always picked up while the rest of the cache still works.
+
 Other security controls:
 
 - Both images run as non-root (`uid 10001` for the API, `101` for nginx) and pods drop all Linux capabilities with a `RuntimeDefault` seccomp profile.
@@ -255,9 +265,14 @@ Code: [`terraform/`](terraform/). Details in [`terraform/README.md`](terraform/R
 | `eks.tf` | EKS control plane, IAM roles and a managed node group (`create_eks = true`) |
 | `kind.tf` | the local 3 node kind cluster (1 control plane, 2 workers) with ports 80 and 443 mapped |
 
-AWS calls go to [LocalStack](https://www.localstack.cloud/), so nothing is billed. LocalStack's free edition does not emulate EKS, so the
-app runs on kind instead; the EKS code is still planned with `terraform plan -var create_eks=true` (23 resources) and runs unchanged on
-real AWS with `-var use_localstack=false`.
+The same code runs in two modes, kept apart with Terraform workspaces so their state never mixes:
+
+| Workspace | Target | What it builds |
+|---|---|---|
+| `default` | [LocalStack](https://www.localstack.cloud/) (free, nothing billed) + kind | VPC, subnets and NAT emulated locally; the cluster is kind, because LocalStack's free edition has no EKS |
+| `aws` | real AWS, `ap-southeast-2` (Sydney) | VPC, subnets, NAT, EKS 1.35, managed node group, Pod Identity and the EBS CSI driver: 26 resources |
+
+Local run:
 
 ```bash
 docker compose -f terraform/localstack/docker-compose.yml -p fellow-localstack up -d
@@ -267,6 +282,19 @@ terraform plan          # 15 resources
 terraform apply
 terraform destroy       # removes the VPC, subnets, NAT and the kind cluster
 ```
+
+Real AWS run (authenticated with `aws login`, short-lived credentials, no access keys on disk):
+
+```bash
+cd terraform
+terraform workspace select aws
+terraform plan  -var-file=aws-sydney.tfvars    # 26 to add
+terraform apply -var-file=aws-sydney.tfvars
+terraform destroy -var-file=aws-sydney.tfvars
+```
+
+`aws-sydney.tfvars` (gitignored) sets `use_localstack=false`, `create_eks=true`, `create_kind_cluster=false`, region `ap-southeast-2`
+with zones `2a` and `2b`, and `node_instance_types=["m7i-flex.large"]`.
 
 ## Kubernetes and Helm
 
@@ -327,6 +355,46 @@ During testing, CPU reached about 350% of the target and the HPA scaled the back
 
 - UI: http://argocd.localhost (user `admin`)
 - Password: `kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}' | base64 -d`
+
+## Real AWS deployment: VPC and EKS
+
+Fellow was deployed to a real Amazon EKS cluster built by the Terraform above, then torn down after the evidence was captured
+(an EKS control plane and a NAT gateway bill by the hour).
+
+```text
+git push ─▶ GitHub Actions ─▶ GHCR (image:<sha>) ─▶ bot commits <sha> to values-staging.yaml
+                                                          │
+             AWS ap-southeast-2                           ▼  (Argo CD pulls from Git)
+  ┌─────────────────────────────── VPC 10.20.0.0/16 ─────────────────────────────┐
+  │ public subnets 2a, 2b:  Network Load Balancer, NAT gateway                    │
+  │ private subnets 2a, 2b: EKS 1.35 node group (2 x m7i-flex.large)              │
+  │      ingress-nginx ─▶ frontend x2, backend x2-6 (HPA) ─▶ Postgres on EBS gp2  │
+  │      Argo CD, metrics-server, EBS CSI driver (Pod Identity)                   │
+  └──────────────────────────────────────────────────────────────────────────────┘
+```
+
+| Piece | How |
+|---|---|
+| Cluster add-ons | [`scripts/eks-up.sh`](scripts/eks-up.sh): kubeconfig, ingress-nginx (AWS provider, creates the NLB), metrics-server, Argo CD, a random database password in a Secret, then the Application |
+| Application | [`argocd/fellow-eks.yaml`](argocd/fellow-eks.yaml): the same chart with `values-staging.yaml` plus [`values-eks.yaml`](helm/fellow/values-eks.yaml) (gp2 storage class, no host rule so the NLB hostname works) |
+| Storage | The EBS CSI driver add-on, authorised through EKS Pod Identity, provisions a 1 GiB gp2 volume for Postgres |
+| Delivery | A push to `main` reaches EKS with no manual step: CI pushes the SHA image and commits the tag, Argo CD on EKS pulls the change and rolls the pods |
+| Teardown | [`scripts/eks-down.sh`](scripts/eks-down.sh) deletes the app and ingress first, which releases the NLB and EBS volume, then `terraform destroy` |
+
+**Why Argo CD pulls instead of Actions pushing.** The AWS account belongs to an organisation whose policies deny creating IAM OIDC
+providers, so GitHub Actions cannot get AWS credentials without long-lived keys. Argo CD runs inside the cluster and pulls from
+Git, so CI never needs cluster or AWS credentials at all. That is the GitOps pull model, and it is the safer design anyway.
+
+**Verified end to end.** Commit `ba69d69` ran through all five CI jobs (Trivy 0 HIGH, 0 CRITICAL), the bot promoted it, and both
+EKS deployments rolled to `hrms-*:ba69d69...` with 2/2 pods ready, served at the NLB's `*.elb.ap-southeast-2.amazonaws.com` address.
+
+| | |
+|---|---|
+| ![terraform plan](docs/screenshots/rubric/m7-aws-plan.png) **`terraform plan` on real AWS** | ![terraform apply](docs/screenshots/rubric/m7-aws-apply.png) **`terraform apply` complete** |
+| ![VPC and subnets](docs/screenshots/rubric/m7-aws-vpc-subnets.png) **VPC and 4 subnets** | ![NAT and EKS](docs/screenshots/rubric/m7-aws-nat-eks-cluster.png) **NAT gateway and EKS cluster, ACTIVE** |
+| ![Node group and EC2](docs/screenshots/rubric/m8-eks-nodegroup-ec2.png) **Node group and EC2 workers** | ![Nodes](docs/screenshots/rubric/m8-eks-nodes.png) **`kubectl get nodes` on EKS** |
+| ![Workloads](docs/screenshots/rubric/m8-eks-workloads.png) **Pods, services, ingress, HPA, PVC, Argo CD Synced** | ![Load balancer](docs/screenshots/rubric/m8-eks-lb.png) **AWS Network Load Balancer** |
+| ![App on EKS](docs/screenshots/rubric/m8-eks-app.png) **Fellow served from EKS** | ![Actions run](docs/screenshots/rubric/m5-actions-eks.png) **The CI run that deployed it** |
 
 ## Observability
 
@@ -395,7 +463,8 @@ Browser screenshots are captured live from the running stack with [`tools/screen
 ## Known issues and limitations
 
 - **Render free tier.** The API spins down after 15 minutes without traffic and takes about a minute to wake up, and the free database expires 30 days after creation (with a 14 day grace period).
-- **EKS runs on kind locally.** LocalStack's free edition has no EKS, so Kubernetes runs on a local kind cluster created by Terraform. The EKS Terraform code is planned but has not been applied to a real AWS account, to avoid cost.
+- **EKS is not left running.** The real EKS deployment was applied, verified and destroyed to avoid hourly cost; the always-on public demo is the Render deployment, and day-to-day Kubernetes work uses the kind cluster.
+- **AWS organisation limits.** The account's policies only allow `ap-southeast-2` and deny IAM OIDC providers, so the cluster is in Sydney and CI deploys through Argo CD rather than with AWS credentials. The account's free plan also limits node types, hence `m7i-flex.large`.
 - **LocalStack is pinned to `4.14`,** the last community image that starts without an account. Newer images need a free auth token (see `terraform/localstack/docker-compose.yml`).
 - **ingress-nginx is retired upstream** (maintenance ended in March 2026). It works for this demo; a production setup would move to the Gateway API or another controller such as Traefik.
 - **No authentication.** The "Viewing as" switcher stands in for login, so any visitor can act as any user. Real use needs SSO or OAuth and server-side authorization.

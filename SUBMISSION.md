@@ -64,7 +64,7 @@ Video times below are `mm:ss` in `demo/fellow-demo.mp4`.
 | Images for frontend and backend | `Image backend` / `Image frontend` matrix jobs |
 | Pushed to GHCR | `ghcr.io/manasvi-247/hrms-backend` and `ghcr.io/manasvi-247/hrms-frontend` |
 | Tags use the commit SHA, not `latest` | Tags are `${GITHUB_SHA}` only |
-| Live run | Video 03:41 (a real push) to 04:36 (all five jobs green); runs at https://github.com/Manasvi-247/fellow-hrms/actions |
+| Live run | Video 03:41 (a real push) to 04:36 (all five jobs green); runs at https://github.com/Manasvi-247/fellow-hrms/actions. Run 39146305868 deployed commit `ba69d69` through to EKS |
 
 ## M6: DevSecOps with Trivy (5)
 
@@ -77,7 +77,8 @@ Video times below are `mm:ss` in `demo/fellow-demo.mp4`.
 **What Trivy scanned and what it means.** Trivy scans two layers of each built image: the operating system packages of the
 base image (Debian for the API, Alpine for nginx) and the language packages installed into it (Python wheels). The
 pipeline fails if any HIGH or CRITICAL vulnerability with an available fix is found, so a vulnerable image is never
-pushed to the registry. Current scans report 0 HIGH and 0 CRITICAL for both images.
+pushed to the registry. Current scans report 0 HIGH and 0 CRITICAL for both images. A later run caught CVE-2026-77214 in
+libexpat because the build cache replayed an old `apk upgrade` layer; a per-run build argument now forces that layer to rebuild.
 
 **A CVE it found.** The first run failed on [CVE-2025-62727](https://avd.aquasec.com/nvd/cve-2025-62727) in Starlette 0.41.3,
 the web framework FastAPI is built on. A request with a crafted `Range` header made the server merge byte ranges
@@ -91,16 +92,17 @@ moving to nginx 1.30 and running `apk upgrade` in the image.
 |---|---|
 | Valid HCL in `terraform/` | [`terraform/`](terraform/): `network.tf`, `eks.tf`, `kind.tf`, `providers.tf`, `variables.tf`, `outputs.tf` |
 | `terraform init` | Pins `hashicorp/aws ~> 6.69` and `tehcyx/kind ~> 0.11`; lock file committed |
-| `terraform plan` (non-empty, no errors) | 15 resources by default, 23 with `-var create_eks=true`; video 05:03 and 05:31 |
+| `terraform plan` (non-empty, no errors) | Local: 15 resources (video 05:03 and 05:31). Real AWS: 26 to add in workspace `aws` with `aws-sydney.tfvars` |
 | VPC with 2+ public subnets | [`terraform/network.tf`](terraform/network.tf): VPC `10.20.0.0/16`, 2 public and 2 private subnets in 2 AZs, internet gateway, NAT gateway, route tables |
-| EKS with a worker node group | [`terraform/eks.tf`](terraform/eks.tf): EKS cluster, IAM roles and a managed node group (`create_eks = true`) |
-| `terraform destroy` | Tested: destroying and re-applying the network ran cleanly (14 resources each way); `terraform destroy` also removes the kind cluster |
+| EKS with a worker node group | [`terraform/eks.tf`](terraform/eks.tf): EKS 1.35, IAM roles, managed node group (2 x m7i-flex.large), Pod Identity and EBS CSI add-ons. Applied to real AWS in `ap-southeast-2`: cluster ACTIVE, 2 nodes Ready |
+| `terraform destroy` | Local: destroy and re-apply ran cleanly (14 resources each way). Real AWS: [`scripts/eks-down.sh`](scripts/eks-down.sh) releases the load balancer and EBS volume, then `terraform destroy` removed every resource |
 | `terraform.tfvars.example`, no credentials | [`terraform/terraform.tfvars.example`](terraform/terraform.tfvars.example); `*.tfvars` and state are gitignored |
 
-**Note on AWS.** AWS calls go to LocalStack so nothing is billed. LocalStack's free edition does not emulate EKS, so the
-VPC resources are created in LocalStack and the cluster runs on kind, which Terraform also creates. The EKS code is
-planned with `create_eks=true` and runs unchanged on real AWS with `-var use_localstack=false`. The emulated subnets are
-shown in the video at about 05:20 (`aws ec2 describe-subnets` against LocalStack). Details: [`terraform/README.md`](terraform/README.md).
+**Note on AWS.** The same Terraform runs in two workspaces. `default` targets LocalStack and kind (free, shown in the video at
+about 05:20). `aws` targets a real AWS account in `ap-southeast-2`: VPC, 2 public and 2 private subnets, NAT gateway, EKS and
+its node group were applied, Fellow was deployed onto EKS by Argo CD and served through an AWS Network Load Balancer, and
+everything was then destroyed to stop hourly billing. The organisation's policies deny IAM OIDC providers, so GitHub Actions
+deploys through Argo CD's pull model instead of holding AWS credentials. Details and evidence: [README: Real AWS deployment](README.md#real-aws-deployment-vpc-and-eks).
 
 ## M8: Kubernetes and Helm (15)
 
@@ -116,7 +118,9 @@ shown in the video at about 05:20 (`aws ec2 describe-subnets` against LocalStack
 
 Also included: an HPA that scaled the backend from 2 to 6 pods under load (video 06:32), migrations that run once under a
 Postgres advisory lock, non-root pods with dropped capabilities, and a second environment (`fellow-staging`) deployed
-by Argo CD from Git (video 04:37).
+by Argo CD from Git (video 04:37). The same chart also ran on real Amazon EKS
+([`argocd/fellow-eks.yaml`](argocd/fellow-eks.yaml), [`helm/fellow/values-eks.yaml`](helm/fellow/values-eks.yaml)) with Postgres on
+an EBS gp2 volume and the HPA reading metrics-server.
 
 ## M9: Observability (10)
 
@@ -152,7 +156,7 @@ by Argo CD from Git (video 04:37).
 
 ## Known limitations
 
-- EKS is planned but not applied to a real AWS account (cost); the app runs on kind, created by the same Terraform.
+- EKS was applied, verified and destroyed (hourly cost), so it is not live; the always-on demo is on Render.
 - ingress-nginx is retired upstream; it works for this demo.
 - The live Render demo uses free instances: the API sleeps when idle and the free database expires after 30 days.
 
