@@ -99,6 +99,9 @@ jobs:
           load: true
           push: false
           tags: ${{ steps.meta.outputs.image }}
+          # A new value each run forces the frontend's apk upgrade layer to rebuild, so security fixes are never cached away.
+          build-args: |
+            APK_REFRESH=${{ github.run_id }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
