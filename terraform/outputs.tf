@@ -23,6 +23,11 @@ output "eks_cluster_name" {
   value       = try(aws_eks_cluster.main[0].name, null)
 }
 
+output "eks_endpoint" {
+  description = "EKS API server endpoint, when create_eks is true."
+  value       = try(aws_eks_cluster.main[0].endpoint, null)
+}
+
 output "eks_update_kubeconfig" {
   description = "Command to point kubectl at EKS."
   value       = var.create_eks ? "aws eks update-kubeconfig --region ${var.aws_region} --name ${var.cluster_name}" : null

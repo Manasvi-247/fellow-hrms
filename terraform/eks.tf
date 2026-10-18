@@ -86,3 +86,46 @@ resource "aws_eks_node_group" "main" {
 
   depends_on = [aws_iam_role_policy_attachment.eks_nodes, aws_route_table_association.private]
 }
+
+# EBS CSI driver so PersistentVolumeClaims (the Postgres StatefulSet) get real EBS volumes, authorised with EKS Pod Identity.
+resource "aws_eks_addon" "pod_identity" {
+  count        = var.create_eks ? 1 : 0
+  cluster_name = aws_eks_cluster.main[0].name
+  addon_name   = "eks-pod-identity-agent"
+  depends_on   = [aws_eks_node_group.main]
+}
+
+data "aws_iam_policy_document" "ebs_csi_assume" {
+  statement {
+    actions = ["sts:AssumeRole", "sts:TagSession"]
+    principals {
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "ebs_csi" {
+  count              = var.create_eks ? 1 : 0
+  name               = "${local.name}-ebs-csi"
+  assume_role_policy = data.aws_iam_policy_document.ebs_csi_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "ebs_csi" {
+  count      = var.create_eks ? 1 : 0
+  role       = aws_iam_role.ebs_csi[0].name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
+resource "aws_eks_addon" "ebs_csi" {
+  count        = var.create_eks ? 1 : 0
+  cluster_name = aws_eks_cluster.main[0].name
+  addon_name   = "aws-ebs-csi-driver"
+
+  pod_identity_association {
+    role_arn        = aws_iam_role.ebs_csi[0].arn
+    service_account = "ebs-csi-controller-sa"
+  }
+
+  depends_on = [aws_eks_addon.pod_identity, aws_iam_role_policy_attachment.ebs_csi]
+}
